@@ -1,0 +1,68 @@
+#information td {
+    text-align: right;
+}
+
+.firstrow {
+}
+
+.uptodate {
+}
+
+.outdated {
+    background-color: #FFBBBC;
+}
+
+table.readings {
+    border: 0px;
+}
+
+table.readings td {
+    padding: 0px;
+}
+
+td.reading {
+    text-align: left;
+}
+
+table.readings th {
+    padding: 0px;
+}
+
+.error {
+    color: #ff6666;
+}
+
+.footer {
+    position: absolute;
+    top: 0px;
+    right: 0px;
+    color: grey;
+    text-align: right;
+    text-decoration: none;
+    text-transform: lowercase;
+}
+
+.realfooter {
+    position: fixed;
+    bottom: 0px;
+    height: 25px;
+    right: 0px;
+    text-align: right;
+    background: rgb(199, 199, 199);
+    width: 100%;
+    padding: 0px;
+}
+
+.qrdiv {
+    position: absolute;
+    top: 200px;
+    right: 10px;
+}
+
+.reading {
+    text-align: right;
+}
+
+body {
+    margin-bottom: 25px;
+}

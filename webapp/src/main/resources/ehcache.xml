@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ehcache xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="http://ehcache.org/ehcache.xsd">
+
+    <defaultCache
+            eternal="false"
+            maxElementsInMemory="500"
+            overflowToDisk="false"
+            diskPersistent="false"
+            timeToIdleSeconds="0"
+            timeToLiveSeconds="120"
+            memoryStoreEvictionPolicy="LRU"
+            />
+
+    <cache name="eu.uberdust.formatter.HtmlFormatter.formatNode"
+           eternal="false"
+           maxElementsInMemory="200"
+           overflowToDisk="false"
+           diskPersistent="false"
+           timeToIdleSeconds="0"
+           timeToLiveSeconds="60"
+           memoryStoreEvictionPolicy="LRU"
+           />
+    <cache name="eu.uberdust.formatter.HtmlFormatter.formatLink"
+           eternal="false"
+           maxElementsInMemory="200"
+           overflowToDisk="false"
+           diskPersistent="false"
+           timeToIdleSeconds="0"
+           timeToLiveSeconds="60"
+           memoryStoreEvictionPolicy="LRU"
+           />
+
+    <cache name="eu.uberdust.formatter.HtmlFormatter.formatCapability"
+           eternal="false"
+           maxElementsInMemory="20"
+           overflowToDisk="false"
+           diskPersistent="false"
+           timeToIdleSeconds="0"
+           timeToLiveSeconds="120"
+           memoryStoreEvictionPolicy="LRU"
+           />
+
+    <cache name="eu.uberdust.formatter.HtmlFormatter.formatNodes"
+           eternal="false"
+           maxElementsInMemory="5"
+           overflowToDisk="false"
+           diskPersistent="false"
+           timeToIdleSeconds="0"
+           timeToLiveSeconds="12"
+           memoryStoreEvictionPolicy="LRU"
+           />
+
+    <cache name="eu.uberdust.formatter.HtmlFormatter.formatLinks"
+           eternal="false"
+           maxElementsInMemory="5"
+           overflowToDisk="false"
+           diskPersistent="false"
+           timeToIdleSeconds="0"
+           timeToLiveSeconds="12"
+           memoryStoreEvictionPolicy="LRU"
+           />
+
+    <cache name="eu.uberdust.formatter.HtmlFormatter.formatCapabilities"
+           eternal="false"
+           maxElementsInMemory="5"
+           overflowToDisk="false"
+           diskPersistent="false"
+           timeToIdleSeconds="0"
+           timeToLiveSeconds="12"
+           memoryStoreEvictionPolicy="LRU"
+           />
+
+    <cache name="eu.wisebed.wisedb.controller.NodeControllerImpl.list"
+           eternal="false"
+           maxElementsInMemory="5"
+           overflowToDisk="false"
+           diskPersistent="false"
+           timeToIdleSeconds="0"
+           timeToLiveSeconds="10"
+           memoryStoreEvictionPolicy="LRU"
+           />
+    <cache name="eu.wisebed.wisedb.controller.LinkControllerImpl.list"
+           eternal="false"
+           maxElementsInMemory="5"
+           overflowToDisk="false"
+           diskPersistent="false"
+           timeToIdleSeconds="0"
+           timeToLiveSeconds="10"
+           memoryStoreEvictionPolicy="LRU"
+           />
+    <cache name="eu.wisebed.wisedb.controller.CapabilityControllerImpl.list"
+           eternal="false"
+           maxElementsInMemory="5"
+           overflowToDisk="false"
+           diskPersistent="false"
+           timeToIdleSeconds="0"
+           timeToLiveSeconds="10"
+           memoryStoreEvictionPolicy="LRU"
+           />
+    <cache name="eu.wisebed.wisedb.controller.NodeCapabilityControllerImpl.list"
+           eternal="true"
+           maxElementsInMemory="5"
+           overflowToDisk="false"
+           diskPersistent="false"
+           timeToIdleSeconds="0"
+           timeToLiveSeconds="0"
+           memoryStoreEvictionPolicy="LRU"
+           />
+    <cache name="eu.wisebed.wisedb.controller.LinkCapabilityControllerImpl.list"
+           eternal="true"
+           maxElementsInMemory="5"
+           overflowToDisk="false"
+           diskPersistent="false"
+           timeToIdleSeconds="0"
+           timeToLiveSeconds="0"
+           memoryStoreEvictionPolicy="LRU"
+           />
+
+    <cache name="eu.wisebed.wisedb.controller.NodeReadingControllerImpl.getByIDs"
+           eternal="false"
+           maxElementsInMemory="200"
+           overflowToDisk="false"
+           diskPersistent="false"
+           timeToIdleSeconds="0"
+           timeToLiveSeconds="36000"
+           memoryStoreEvictionPolicy="LRU"
+            />
+    <cache name="eu.wisebed.wisedb.controller.NodeCapabilityControllerImpl.getByIDs"
+           eternal="false"
+           maxElementsInMemory="10"
+           overflowToDisk="false"
+           diskPersistent="false"
+           timeToIdleSeconds="0"
+           timeToLiveSeconds="36000"
+           memoryStoreEvictionPolicy="LRU"
+            />
+
+
+</ehcache>

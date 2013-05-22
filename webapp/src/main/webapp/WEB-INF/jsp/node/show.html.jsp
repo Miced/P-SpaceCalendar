@@ -1,0 +1,46 @@
+<%@ page contentType="text/html;charset=UTF-8" %>
+<%@ page pageEncoding="UTF-8" %>
+<%@ page session="false" %>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/fmt" prefix="fmt" %>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/functions" prefix="fn" %>
+<%@ taglib uri="http://www.springframework.org/tags" prefix="spring" %>
+
+<jsp:useBean id="testbed" scope="request" class="eu.wisebed.wisedb.model.Testbed"/>
+<jsp:useBean id="node" scope="request" class="eu.wisebed.wisedb.model.Node"/>
+<jsp:useBean id="text" scope="request" class="java.lang.String"/>
+<jsp:useBean id="nodeCapabilities" scope="request" class="java.lang.String"/>
+
+<html>
+<head>
+    <META NAME="Description" CONTENT="ÜberDust"/>
+    <META http-equiv="Content-Language" content="en"/>
+    <META http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>ÜberDust - Show Node : <c:out value="${node.name}"/></title>
+    <link rel="stylesheet" type="text/css" href="<c:url value="/css/styles.css"/>"/>
+    <script type="text/javascript" src="/js/qrcode.js"></script>
+    <%@include file="/googleAnalytics.jsp"%>
+</head>
+<body>
+<%@include file="/header.jsp" %>
+<p>
+    /<a href="<c:url value="/rest/testbed"/>">testbeds</a>/
+    <a href="<c:url value="/rest/testbed/${testbed.id}"/>">testbed</a>/
+    <a href="<c:url value="/rest/testbed/${testbed.id}/node/${node.name}"/>">node</a>
+</p>
+
+<c:out value="${text}" escapeXml="false" />
+
+<c:out value="${nodeCapabilities}" escapeXml="false" />
+
+<div id="qrdiv" class="qrdiv">
+        <img id="qr" src="" alt="QRCode" width="150px"/>
+        <script type="text/javascript">
+            document.getElementById("qr").src="http://qrfree.kaywa.com/?s=8&d="+encodeURIComponent(window.location+"rdf/rdf+xml/");
+        </script>
+</div>
+
+
+<%@include file="/footer.jsp" %>
+</body>
+</html>

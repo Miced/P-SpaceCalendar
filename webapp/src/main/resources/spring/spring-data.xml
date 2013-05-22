@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+
+    <!-- Data Source setup -->
+    <bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+        <property name="username" value="${wisedb.jdbc.connection.username}"/>
+        <property name="password" value="${wisedb.jdbc.connection.password}"/>
+        <property name="url" value="${wisedb.jdbc.connection.url}"/>
+        <property name="driverClassName" value="com.mysql.jdbc.Driver"/>
+        <property name="initialSize" value="0"/>
+        <property name="maxActive" value="20"/>
+        <property name="minIdle" value="0"/>
+        <property name="poolPreparedStatements" value="false"/>
+        <property name="defaultAutoCommit" value="false"/>
+        <property name="defaultTransactionIsolation" value="1"/>
+        <property name="testOnBorrow" value="true"/>
+        <property name="testOnReturn" value="true"/>
+        <property name="testWhileIdle" value="true"/>
+        <property name="timeBetweenEvictionRunsMillis" value="10000"/>
+        <property name="validationQuery" value="select 1"/>
+    </bean>
+
+    <!-- Session Factory setup with hbm mappings in place -->
+    <bean id="sessionFactory" class="org.springframework.orm.hibernate3.LocalSessionFactoryBean">
+        <property name="dataSource" ref="dataSource"/>
+
+
+        <property name="mappingResources">
+            <list>
+                <value>eu/wisebed/wisedb/model/Testbed.hbm.xml</value>
+                <value>eu/wisebed/wisedb/model/Setup.hbm.xml</value>
+                <value>eu/wisebed/wisedb/model/Node.hbm.xml</value>
+                <value>eu/wisebed/wisedb/model/Link.hbm.xml</value>
+                <value>eu/wisebed/wisedb/model/Capability.hbm.xml</value>
+                <value>eu/wisebed/wisedb/model/NodeCapability.hbm.xml</value>
+                <value>eu/wisebed/wisedb/model/LinkCapability.hbm.xml</value>
+                <value>eu/wisebed/wisedb/model/LinkReading.hbm.xml</value>
+                <value>eu/wisebed/wisedb/model/NodeReading.hbm.xml</value>
+                <value>eu/wisebed/wisedb/model/LastNodeReading.hbm.xml</value>
+                <value>eu/wisebed/wisedb/model/LastLinkReading.hbm.xml</value>
+            </list>
+        </property>
+        <!-- Also set of hibernate properties -->
+        <property name="hibernateProperties">
+            <props>
+                <prop key="hibernate.dialect">org.hibernate.dialect.MySQL5InnoDBDialect</prop>
+                <prop key="hibernate.connection.characterEncoding">UTF-8</prop>
+                <prop key="hibernate.connection.useUnicode">true</prop>
+                <prop key="current_session_context_class">managed</prop>
+                <prop key="cache.provider_class">org.hibernate.cache.NoCacheProvider</prop>
+                <prop key="log4j.logger.net.sf.hibernate">warn</prop>
+                <prop key="show_sql">false</prop>
+                <prop key="format_sql">false</prop>
+                <prop key="hibernate.hbm2ddl.auto">${wisedb.hibernate.hbm2ddl.auto}</prop>
+                <prop key="autoReconnect">true</prop>
+
+            </props>
+        </property>
+        <!--
+        <property name="annotatedClasses">
+            <list>
+                <value>eu.wisebed.wisedb.model.Testbed</value>
+                <value>eu.wisebed.wisedb.model.Setup</value>
+                <value>eu.wisebed.wisedb.model.Capability</value>
+                <value>eu.wisebed.wisedb.model.Node</value>
+                <value>eu.wisebed.wisedb.model.Link</value>
+                <value>eu.wisebed.wisedb.model.NodeCapability</value>
+                <value>eu.wisebed.wisedb.model.LinkCapability</value>
+                <value>eu.wisebed.wisedb.model.NodeReading</value>
+                <value>eu.wisebed.wisedb.model.LinkReading</value>
+                <value>eu.wisebed.wisedb.model.LastNodeReading</value>
+                <value>eu.wisebed.wisedb.model.LastLinkReading</value>
+            </list>
+        </property>-->
+
+        <property name="eventListeners">
+            <map>
+                <entry key="save-update">
+                    <bean class="eu.wisebed.wisedb.listeners.LastNodeReadingListener"/>
+                </entry>
+            </map>
+        </property>
+
+    </bean>
+
+
+    <!--injecting a transaction manager to session factory -->
+    <bean id="transactionManager"
+          class="org.springframework.orm.hibernate3.HibernateTransactionManager">
+        <property name="sessionFactory" ref="sessionFactory"/>
+    </bean>
+
+    <!-- A Transaction Proxy bean -->
+    <bean id="proxyTemplate"
+          class="org.springframework.transaction.interceptor.TransactionProxyFactoryBean"
+          abstract="true">
+        <property name="transactionManager" ref="transactionManager"/>
+        <property name="transactionAttributes">
+            <props>
+                <prop key="get*">PROPAGATION_SUPPORTS,readOnly</prop>
+                <prop key="list*">PROPAGATION_SUPPORTS,readOnly</prop>
+                <prop key="add*">PROPAGATION_REQUIRED</prop>
+                <prop key="update*">PROPAGATION_REQUIRED</prop>
+                <prop key="delete*">PROPAGATION_REQUIRED</prop>
+                <prop key="*">PROPAGATION_REQUIRED</prop>
+            </props>
+        </property>
+
+    </bean>
+
+
+    <!-- abstractManager (Persistence controller/manager) -->
+    <bean id="abstractManager" class="eu.wisebed.wisedb.controller.AbstractController" abstract="true">
+        <property name="sessionFactory" ref="sessionFactory"/>
+    </bean>
+
+    <!-- testbedManager -->
+    <bean id="testbedManager" parent="proxyTemplate">
+        <property name="target" ref="testbedManagerTarget"/>
+    </bean>
+    <!-- setupManager -->
+    <bean id="setupManager" parent="proxyTemplate">
+        <property name="target" ref="setupManagerTarget"/>
+    </bean>
+    <!-- capabilityManager -->
+    <bean id="capabilityManager" parent="proxyTemplate">
+        <property name="target" ref="capabilityManagerTarget"/>
+    </bean>
+    <!-- nodeManager -->
+    <bean id="nodeManager" parent="proxyTemplate">
+        <property name="target" ref="nodeManagerTarget"/>
+    </bean>
+    <!-- nodeCapabilityManager -->
+    <bean id="nodeCapabilityManager" parent="proxyTemplate">
+        <property name="target" ref="nodeCapabilityManagerTarget"/>
+    </bean>
+    <!-- nodeReadingManager -->
+    <bean id="nodeReadingManager" parent="proxyTemplate">
+        <property name="target" ref="nodeReadingManagerTarget"/>
+    </bean>
+    <!-- lastNodeReadingManager -->
+    <bean id="lastNodeReadingManager" parent="proxyTemplate">
+        <property name="target" ref="lastNodeReadingManagerTarget"/>
+    </bean>
+    <!-- linkManager -->
+    <bean id="linkManager" parent="proxyTemplate">
+        <property name="target" ref="linkManagerTarget"/>
+    </bean>
+    <!-- linkCapabilityManager -->
+    <bean id="linkCapabilityManager" parent="proxyTemplate">
+        <property name="target" ref="linkCapabilityManagerTarget"/>
+    </bean>
+    <!-- linkReadingManager -->
+    <bean id="linkReadingManager" parent="proxyTemplate">
+        <property name="target" ref="linkReadingManagerTarget"/>
+    </bean>
+    <!-- lastLinkReadingManager -->
+    <bean id="lastLinkReadingManager" parent="proxyTemplate">
+        <property name="target" ref="lastLinkReadingManagerTarget"/>
+    </bean>
+
+    <!-- TARGETS -->
+
+    <bean id="testbedManagerTarget" class="eu.wisebed.wisedb.controller.TestbedControllerImpl"
+          parent="abstractManager" factory-method="getInstance">
+    </bean>
+
+    <bean id="setupManagerTarget" class="eu.wisebed.wisedb.controller.SetupControllerImpl"
+          parent="abstractManager" factory-method="getInstance"/>
+
+    <bean id="nodeManagerTarget" class="eu.wisebed.wisedb.controller.NodeControllerImpl"
+          parent="abstractManager" factory-method="getInstance"/>
+
+    <bean id="nodeCapabilityManagerTarget" class="eu.wisebed.wisedb.controller.NodeCapabilityControllerImpl"
+          parent="abstractManager" factory-method="getInstance"/>
+
+    <bean id="linkCapabilityManagerTarget" class="eu.wisebed.wisedb.controller.LinkCapabilityControllerImpl"
+          parent="abstractManager" factory-method="getInstance"/>
+
+    <bean id="linkManagerTarget" class="eu.wisebed.wisedb.controller.LinkControllerImpl"
+          parent="abstractManager" factory-method="getInstance"/>
+
+    <bean id="capabilityManagerTarget" class="eu.wisebed.wisedb.controller.CapabilityControllerImpl"
+          parent="abstractManager" factory-method="getInstance"/>
+
+    <bean id="nodeReadingManagerTarget" class="eu.wisebed.wisedb.controller.NodeReadingControllerImpl"
+          parent="abstractManager" factory-method="getInstance"/>
+
+    <bean id="linkReadingManagerTarget" class="eu.wisebed.wisedb.controller.LinkReadingControllerImpl"
+          parent="abstractManager" factory-method="getInstance"/>
+
+    <bean id="lastNodeReadingManagerTarget" class="eu.wisebed.wisedb.controller.LastNodeReadingControllerImpl"
+          parent="abstractManager" factory-method="getInstance"/>
+
+    <bean id="lastLinkReadingManagerTarget" class="eu.wisebed.wisedb.controller.LastLinkReadingControllerImpl"
+          parent="abstractManager" factory-method="getInstance"/>
+
+    <!-- lastNodeReadingConsumer bean -->
+    <bean id="lastNodeReadingConsumer" class="eu.wisebed.wisedb.listeners.LastNodeReadingConsumer"
+          factory-method="getInstance"/>
+
+</beans>
