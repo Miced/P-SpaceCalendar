@@ -1,0 +1,211 @@
+<?php
+function chart_show_all(){ ?>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7/jquery.js"></script>
+    <script type="text/javascript">
+        <?php
+
+    function submit(){
+
+
+    if(isset($_GET['capabilities'])&& ($_GET['capabilities']!="0")){
+      echo "console.log('submit');";
+        $nodeUrn1 = explode(" ",urldecode($_GET["node"]));
+        $nodeUrn=$nodeUrn1[1];
+        $temp =explode(":",$nodeUrn);
+        $nodeMac=$temp[4];
+        $capability=$_GET["capabilities"];
+        $capabilityUrn="urn:wisebed:node:".$nodeMac."capability:".$capability;
+
+        $room = "CTI Room 0.I.1";
+        $maxRows = 10;
+        $unit="(lux)";
+        $set_date= false;
+
+         if (isset($_GET['from'])&&isset($_GET["to"])){
+            $set_date=true;
+            $from = explode("-",$_GET['from']);
+            $to =explode("-",$_GET['to']);
+            $date_from = mktime($from[3],$from[4],$from[5],$from[1],$from[2],$from[0])*1000;
+            $date_to = mktime($to[3],$to[4],$to[5],$to[1],$to[2],$to[0])*1000;
+         }
+
+    ?>
+        var chart;
+
+        $(document).ready(function() {
+            chart = new Highcharts.Chart({
+                chart: {
+                    renderTo: 'container',
+                    defaultSeriesType: 'spline',
+                    zoomType: 'x',
+                    spacingRight: 20
+                },
+                title: {
+                    text: '<?=$capability?> chart inside <?= $room?>'
+
+                },
+                subtitle: {
+                    text: '<?=$nodeMac?>'
+                },
+                xAxis: {
+                    type: 'datetime',
+                    dateTimeLabelFormats: {
+                        day: '%e %b',
+                        month: '%e %b'
+                    },
+                    tickPixelInterval: 400,
+                    maxZoom: 1000
+                },
+                yAxis: {
+                    title: {
+                        text: '<?= $capability." ".$unit ?>'
+                    },
+                    min: 0.6,
+                    startOnTick: false,
+                    showFirstLabel: false
+                },
+                tooltip: {
+                    shared: true
+                },
+                legend: {
+                    enabled: false
+                },
+                plotOptions: {
+                    series: {
+                        lineWidth: 1,
+                        marker: {
+                            enabled: false,
+                            states: {
+                                hover: {
+                                    enabled: true,
+                                    radius: 5
+                                }
+                            }
+                        }
+                    }
+                },
+                series: [
+                    {
+                        name: '<?= $capability?> reading <?= $unit?>',
+                        data: [
+                            <?
+                            if($set_date==1){
+                                $tabdelimited = file_get_contents("http://uberdust.cti.gr/rest/testbed/1/node/".$nodeUrn."/capability/".$capabilityUrn."/tabdelimited/from/".$date_from."/to/".$date_to."/");
+                            }else
+                            {
+                                $tabdelimited = file_get_contents("http://uberdust.cti.gr/rest/testbed/1/node/".$nodeUrn."/capability/".$capabilityUrn."/tabdelimited/limit/".$maxRows);
+                            }
+                            $lines = explode("\n", $tabdelimited);
+                            unset($lines[count($lines)-1]);
+
+                            $firstRow = explode("\t", $lines[0]);
+                            print("         [".$firstRow[0]." , ".$firstRow[1]."]");
+                            unset($lines[0]);
+
+                            foreach ($lines as $thisLine) {
+                              $row = explode("\t", $thisLine);
+
+                              print(",\n                                 [".$row[0]." , ".$row[1]."]");
+                            }
+                            ?>
+                        ]
+                    }
+                ]
+            });
+        });
+
+
+        <?php
+         }//// end of  if(isset($_GET['capabilities'])&& ($_GET['capabilities']!="0"))
+         }//end of submit()
+            submit();
+         ?>
+        var capability= new Array();
+        var cap = new Array();
+        var opt= new Array();
+        <?php
+            $raw = file_get_contents("http://uberdust.cti.gr/rest/testbed/1/status/raw");
+            $lines= explode("\n",$raw);
+            $k=0;
+            $nodes=array();
+            $nodes[0]=" ";
+            for($i=0;$i<sizeof($lines);$i++){
+                $node=explode("\t",$lines[$i]);
+                if(!(in_array($node[0],$nodes))){
+                    $nodes[$k]=$node[0];
+                    if($i!=0){echo '";';}
+                    echo 'capability['.$k.'+1]="';
+                    $k++;
+                }
+                $nodecap = explode(":",$node[1]);
+                unset($node);
+                if ($nodecap[0]== "urn"){
+                    echo $nodecap[4].' ';
+                }
+            }
+            echo '";';
+        ?>
+
+        function showCapabilities(str)
+        {
+            opt= document.getElementById("nodes").value.split("+");
+            option= opt[0];
+            if(option =="0"){
+                document.capform.capabilities.options[0]=new Option("Select Capability:","0");
+                document.capform.capabilities.options.length=1;
+            }else{
+
+                document.capform.capabilities.options[0]=new Option("Select Capability:","0");
+                cap=capability[option].split(" ");
+                for(var i=0;i<cap.length;i++){
+                    document.capform.capabilities.options[i+1]=new Option(cap[i], cap[i]);
+                }
+                document.capform.capabilities.options.length=cap.length;
+            }
+        }
+
+        function onSubmit()
+        {   nodes=document.getElementById("nodes").value;
+            capabilities=document.getElementById("capabilities").value;
+            submit=document.getElementById("submit").value;
+            var xmlhttp;
+            if (window.XMLHttpRequest)
+            {// code for IE7+, Firefox, Chrome, Opera, Safari
+                xmlhttp=new XMLHttpRequest();
+            }
+            else
+            {// code for IE6, IE5
+                xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+            }
+            xmlhttp.onreadystatechange=function()
+            {
+                if (xmlhttp.readyState==4 && xmlhttp.status==200)
+                {
+                    document.getElementById("container").innerHTML=xmlhttp.responseText;
+                }
+            }
+            xmlhttp.open("GET","chart.php?t=" + Math.random()+"&node="+nodes+"&capabilities="+capabilities,true);
+            xmlhttp.send();
+
+        }
+
+    </script>
+
+<form id="theForm" name = "capform" onSubmit="JavaScript:onSubmit()" accept-charset="utf-8">
+    <select id = "nodes" name= "node" onchange="showCapabilities(this.value)">
+        <option value="0">Select Node:</option>
+        <? echo sizeof($nodes);?>
+        <? for($i=1;$i<=sizeof($nodes);$i++){ ?>
+            <option value="<?echo $i."+".$nodes[$i-1];?>"><?echo $nodes[$i-1];?></option>
+        <?  }   ?>
+    </select>
+    <select id="capabilities" name= "capabilities">
+        <option value="0">Select Capability:</option>
+    </select><br><br>
+    <input type="submit" id="submit" value="Show Chart" onClick="JavaScript:onSubmit()">
+</form>
+
+<div id="container"></div>
+<?php
+}//end of function
+
