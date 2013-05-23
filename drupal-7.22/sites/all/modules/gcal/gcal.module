@@ -1,0 +1,1245 @@
+<?php
+
+/**
+ * @file
+ * Google Calendar Api for drupal.
+ */
+
+/**
+ * Implements hook_help().
+ */
+function gcal_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#gcal':
+      $path = $GLOBALS['base_url'] . '/' . drupal_get_path('module', 'gcal');
+      $output = '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t("This module allows you to manage your google calendars. This will help in accessing calendar and performing operations easily.") . '</p>';
+      $output .= '<h3>' . t('Uses') . '</h3>';
+      $output .= '<p>' . t("Apis provided by module will allow you to create, update, delete, fetch calendar details. You can also create, update, delete, get, move a event from particular calendar. You can fetch calendar settings, color details, etc.") . '</p>';
+      $output .= '<p>' . t("For more details read the <a href='@url'>README.txt</a> file in the Google Calendar module directory.", array('@url' => "$path/README.txt")) . '</p>';
+      $output .= '<p>' . t("For api examples read the <a href='@url'>EXAMPLES.txt</a> file in the Google Calendar module directory.", array('@url' => "$path/EXAMPLES.txt")) . '</p>';
+      return $output;
+  }
+}
+
+/**
+ * Implements hook_libraries_info_alter().
+ */
+function gcal_libraries_info_alter(&$libraries) {
+  $libraries['google-api-php-client']['files']['php'][] = 'src/contrib/Google_CalendarService.php';
+}
+
+/**
+ * Returns Array of calendar attributes and google library functions.
+ */
+function gcal_calendar_attributes() {
+  return array(
+    'Summary' => 'setSummary',
+    'Description' => 'setDescription',
+    'Location' => 'setLocation',
+    'TimeZone' => 'setTimeZone',
+    'Id' => 'setId',
+  );
+}
+/**
+ * Returns Array of event attributes and the google library functions.
+ */
+function gcal_event_attributes() {
+  return array(
+    'Creator' => 'setCreator',
+    'Summary' => 'setSummary',
+    'Id' => 'setId',
+    'Attendees' => 'setAttendees',
+    'Recurrence' => 'setRecurrence',
+    'Start' => 'setStart',
+    'Location' => 'setLocation',
+    'Status' => 'setStatus',
+    'Description' => 'setDescription',
+    'EndTimeUnspecified' => 'setEndTimeUnspecified',
+    'Sequence' => 'setSequence',
+    'Visibility' => 'setVisibility',
+    'GuestsCanModify' => 'setGuestsCanModify',
+    'End' => 'setEnd',
+    'AttendeesOmitted' => 'setAttendeesOmitted',
+    'Locked' => 'setLocked',
+    'ColorId' => 'setColorId',
+    'AnyoneCanAddSelf' => 'setAnyoneCanAddSelf',
+    'Reminders' => 'setReminders',
+    'GuestsCanSeeOtherGuests' => 'setGuestsCanSeeOtherGuests',
+    'OriginalStartTime' => 'setOriginalStartTime',
+    'GuestsCanInviteOthers' => 'setGuestsCanInviteOthers',
+    'Transparency' => 'setTransparency',
+    'PrivateCopy' => 'setPrivateCopy',
+  );
+}
+
+/**
+ * Returns Array of calendar settings attributes.
+ */
+function gcal_settings_attributes() {
+  return array(
+    'timezone',
+    'customCalendarMode',
+    'defaultCalendarMode',
+    'timezoneLabel',
+    'hideInvitations',
+    'locale',
+    'country',
+    'defaultEventLength',
+    'userLocation',
+    'weather',
+    'format24HourTime',
+    'alternateCalendar',
+    'dateFieldOrder',
+    'showDeclinedEvents',
+    'displayAllTimezones',
+    'hideWeekends',
+    'weekStart',
+  );
+}
+
+/**
+ * Returns Array of event attendee attributes and the google library functions.
+ */
+function gcal_event_attendee_attributes() {
+  return array(
+    'Comment' => 'setComment',
+    'DisplayName' => 'setDisplayName',
+    'ResponseStatus' => 'setResponseStatus',
+    'AdditionalGuests' => 'setAdditionalGuests',
+    'Optional' => 'setOptional',
+    'Email' => 'setEmail',
+  );
+}
+
+/**
+ * Returns Array of calendar list attributes and the google library functions.
+ */
+function gcal_calendarlist_attributes() {
+  return array(
+    'ForegroundColor' => 'setForegroundColor',
+    'DefaultReminders' => 'setDefaultReminders',
+    'Description' => 'setDescription',
+    'ColorId' => 'setColorId',
+    'Selected' => 'setSelected',
+    'Summary' => 'setSummary',
+    'Location' => 'setLocation',
+    'BackgroundColor' => 'setBackgroundColor',
+    'SummaryOverride' => 'setSummaryOverride',
+    'TimeZone' => 'setTimeZone',
+    'Hidden' => 'setHidden',
+    'AccessRole' => 'setAccessRole',
+    'Id' => 'setId',
+  );
+}
+
+/**
+ * Returns Array of Free Busy attributes and google library functions.
+ */
+function gcal_freebusy_attributes() {
+  return array(
+    'CalendarExpansionMax' => 'setCalendarExpansionMax',
+    'GroupExpansionMax' => 'setGroupExpansionMax',
+    'TimeMax' => 'setTimeMax',
+    'Items' => 'setItems',
+    'TimeMin' => 'setTimeMin',
+    'TimeZone' => 'setTimeZone',
+  );
+}
+
+/**
+ * Returns a Object of Google_CalendarService from google library.
+ */
+function gcal_calendar_object($account_id, $by_name = TRUE) {
+  $info = libraries_load("google-api-php-client");
+  if (!$info['loaded']) {
+    drupal_set_message(t("Can't perform any operation as library is missing check Status report or Readme for requirements"), 'error');
+    return FALSE;
+  }
+  $google_client = gauth_client_get($account_id, $by_name);
+  if (!$google_client) {
+    drupal_set_message(t("Can't create google client object, account is Invalid"), 'error');
+    return FALSE;
+  }
+  return new Google_CalendarService($google_client);
+}
+
+/**
+ * Begin API Functions
+ * In all api functions $by_name should be set FALSE
+ * if you are passing account id of google oauth2 account
+ */
+/** Calendar api functions start **/
+/**
+ * Create a calendar.
+ *
+ * @param array $calendar
+ *   An array of calendar values
+ *  - Summary  - Required
+ *  - Description
+ *  - Location
+ *  - TimeZone
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ *
+ * @return Array
+ *   id - Unique id of the calendar (can be used for further operations)
+ *   etag -  Etag of the calendar
+ *   kind - Kind (usually calendar)
+ *   summary - Summary set for the calendar
+ */
+function gcal_calendar_create($calendar, $account_id, $by_name = TRUE) {
+  if (!is_array($calendar)) {
+    drupal_set_message(t("Please pass array of attributes to create function"));
+    return FALSE;
+  }
+  if (!isset($calendar['Summary'])) {
+    drupal_set_message(t("Please set the summary for the calendar"), 'error');
+    return FALSE;
+  }
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  $attributes = gcal_calendar_attributes();
+  unset($attributes['Id']);
+  $cal = new Google_Calendar();
+  // Clean array before passing it if user has passed any unwanted indexes.
+  $calendar = array_intersect_key($calendar, $attributes);
+  foreach ($calendar as $attr => $val) {
+    $cal->$attributes[$attr]($val);
+  }
+  $new_cal = $gcs->calendars->insert($cal);
+  return $new_cal;
+}
+
+/**
+ * Update a calendar.
+ *
+ * @param array $calendar
+ *   An array of calendar values
+ *  - Summary
+ *  - Description
+ *  - Location
+ *  - TimeZone
+ *  - Id  - Required
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ *
+ * @return array
+ *   Array or FALSE if failed
+ *   id - Unique id of the calendar (can be used for further operations)
+ *   etag -  Etag of the calendar
+ *   kind - Kind (usually calendar)
+ *   summary - Summary set for the calendar
+ */
+function gcal_calendar_update($calendar, $account_id, $by_name = TRUE) {
+  if (!is_array($calendar)) {
+    drupal_set_message(t("Please pass array of attributes to update function"));
+    return FALSE;
+  }
+  if (!isset($calendar['Id'])) {
+    drupal_set_message(t("Please set the id for the calendar"), 'error');
+    return FALSE;
+  }
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  $cal = new Google_Calendar();
+  $attributes = gcal_calendar_attributes();
+  // Clean array before passing it if user has passed any unwanted indexes.
+  $calendar = array_intersect_key($calendar, $attributes);
+  // This global variable is of google client library.
+  global $apiConfig;
+  $oldconfig = isset($apiConfig['use_objects']) ? $apiConfig['use_objects'] : FALSE;
+  $apiConfig['use_objects'] = TRUE;
+  $cal = gcal_calendar_get($calendar['Id'], $account_id, $by_name);
+  $apiConfig['use_objects'] = $oldconfig;
+  foreach ($calendar as $attr => $val) {
+    $cal->$attributes[$attr]($val);
+  }
+  $new_cal = $gcs->calendars->update($calendar['Id'], $cal);
+  return $new_cal;
+}
+
+/**
+ * Delete a calendar.
+ *
+ * @param string $calendar_id
+ *   The calendar id which is to be deleted
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ */
+function gcal_calendar_delete($calendar_id, $account_id, $by_name = TRUE) {
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  $gcs->calendars->delete($calendar_id);
+}
+
+/**
+ * Get the calendar.
+ *
+ * @param string $calendar_id
+ *   The calendar id which is to be fetched
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ *
+ * @return array
+ *   Array of calendar attributes as kind, etag, id, summary(title), timeZone.
+ */
+function gcal_calendar_get($calendar_id, $account_id, $by_name = TRUE) {
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  $cal = $gcs->calendars->get($calendar_id);
+
+  return $cal ? $cal : FALSE;
+}
+
+/**
+ * Make a calendar public.
+ *
+ * @param string $calendar_id
+ *   The Google calendar id
+ *
+ * @param string $account_id
+ *   An email address or an account.  Defaults to the default account.
+ *
+ * @return array
+ *   acl details array on success.
+ */
+function gcal_calendar_public($calendar_id, $account_id, $by_name = TRUE) {
+  $acl = array(
+    'scopeType' => "default",
+    'role' => "reader",
+  );
+  return gcal_acl_create($acl, $calendar_id, $account_id, $by_name);
+}
+
+/**
+ * Make a calendar public.
+ *
+ * @param string $calendar_id
+ *   The Google calendar id
+ *
+ * @param string $account_id
+ *   An email address or an account.  Defaults to the default account.
+ */
+function gcal_calendar_private($calendar_id, $account_id, $by_name = TRUE) {
+  return gcal_acl_delete($calendar_id, "default", $account_id, $by_name);
+}
+/** Calendar api functions end **/
+
+/** Calendar Settings api functions start **/
+/**
+ * Gets single setting details.
+ *
+ * @param string $setting
+ *   Setting name in string which needs to be retrieved.
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ *
+ * @return array
+ *   Array of settings details
+ *   kind - Kind of the setting
+ *   etag - Etag value of the setting
+ *   id - setting name
+ *   value - value of the setting
+ */
+function gcal_setting_get($setting, $account_id, $by_name = TRUE) {
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  if (!in_array($setting, gcal_settings_attributes())) {
+    drupal_set_message(t("Invalid setting name specified"), 'error');
+    return FALSE;
+  }
+  $set = $gcs->settings->get($setting);
+  return $set ? $set : FALSE;
+}
+
+/**
+ * Gets all setting details.
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ *
+ * @return array
+ *   Array of all settings details
+ *   Array of settings each array has
+ *   kind - Kind of the setting
+ *   etag - Etag value of the setting
+ *   id - setting name
+ *   value - value of the setting
+ */
+function gcal_setting_list($account_id, $by_name = TRUE) {
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  $set = $gcs->settings->listSettings();
+  return $set ? $set : FALSE;
+}
+/** Calendar Settings api functions end **/
+
+/** Calendar colors api functions start **/
+/**
+ * Gets all colors details.
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ *
+ * @return Array
+ *   Array of all colors details
+ *   Array of colors each array has
+ *   background - html color code for background
+ *   foreground - html color code for foreground
+ */
+function gcal_colors_get($account_id, $by_name = TRUE) {
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  $colors = $gcs->colors->get();
+  return $colors ? $colors : FALSE;
+}
+/** Calendar colors api functions end **/
+
+/** Event api functions start **/
+/**
+ * Create an event.
+ *
+ * @param array $event
+ *   Event data in an array containing:
+ *  - Start - Event start DateTime  eg '2012-12-24 12:30:00'  - Required
+ *  - End - Event end DateTime      eg '2012-12-24 12:30:00'  - Required
+ *  - Timezone - Event timezone  - Required
+ *  - Creator - Array of creator details as
+ *              DisplayName - Name to be displayed as creator of the event
+ *              Email - Email of the event creator
+ *  - Summary - Title of the event
+ *  - Attendees - Array of attendees
+ *                Each Attendee can have following attributes
+ *                Email - Required, Email address of the attendee
+ *                Comment - Comment given by the attendee
+ *                DisplayName - DisplayName of the attendee
+ *                ResponseStatus - (needAction, declined, tentative, accepted)
+ *                AdditionalGuests - Additional number of attendees with this
+ *                                   participant, default is 0
+ *                Optional - (TRUE/FALSE) Is this attendee optional.
+ *                            Default is FALSE
+ *
+ *  - Recurrence - Array of recurring info as
+ *                 Frequency - (DAILY, WEEKLY, MONTHLY, YEARLY) depending on the
+ *                             event recurring frequency set this value
+ *                             REQUIRED for recurrence
+ *                 Count - Number of the time the event will be limited,
+ *                         don't pass to make the event never ending
+ *                 Until - You can also pass a end date of recurring event
+ *                         i.e. event recur's till this date,
+ *                         format should be 20130104 (yyyymmdd)
+ *                 Byday - You can pass a comma (,) separated list of days for
+ *                         the event to be recurred on these days.
+ *                         eg (Mo,Tu) will repeat the event on Monday and
+ *                         Tuesday, Frequency to be set to WEEKLY.
+ *                         You can also make it occur on every nth day
+ *                         i.e. 4FR will make the event occur on 4th Friday.
+ *                         You need to set the Frequency to MONTHLY
+ *
+ *  - Location - Geographic location of the event as a free form text
+ *  - Status - (confirmed/tentative/cancelled) default value is confirmed
+ *  - Description - Description of the event.
+ *  - EndTimeUnspecified -(TRUE/FALSE) Event end time is unspecified,
+ *                        a default end time still has to be passed,
+ *                        default value is FALSE
+ *  - Sequence - Sequence number as per ICalendar.
+ *  - Visibility - (default/private/public/confidential)
+ *                 default is inherited from calendar, private and
+ *                 confidential are kept private and public is visible to all.
+ *  - GuestsCanModify - (TRUE/FALSE) Whether attendees other than organizer
+ *                      can modify the event, default is FALSE
+ *  - AttendeesOmitted - (TRUE/FALSE) Whether attendees have been ommitted from
+ *                       event. When retrieving event, this may be due to the
+ *                       maxAttendees query. When updating event, can be used to
+ *                       only update participant response, default if FALSE
+ *  - Locked - (TRUE/FALSE) Whether event is locked. no changes can be made to
+ *             summary, description, start, end, location and recurrence values.
+ *  - ColorId - Color id, you can get array of all colors and color ids using
+ *              gcal_colors_get(),
+ *              if not passed calendar color will be the event color
+ *  - AnyoneCanAddSelf - (TRUE/FALSE)If any person can join the event,
+ *                       default is FALSE
+ *  - Reminders - If the event is not using the default reminder settings of
+ *                calendar then send array of reminders time and reminder method
+ *    eg array(0 => array('minutes' => '60', 'method' => 'email'), 1 => .....)
+ *    (60 minutes before event starts) (email or sms for reminder method)
+ *
+ *  - GuestsCanSeeOtherGuests - (TRUE/FALSE) Attendees other than organizer can
+ *                              see attendees, default is TRUE.
+ *  - OriginalStartTime - For instance recurring events this is the time when
+ *                        the event will start according to recurrence data
+ *                        eg '2012-12-24 12:30:00'
+ *  - GuestsCanInviteOthers -  (TRUE/FALSE) Attendees other than organizer can
+ *                             invite people, default is TRUE.
+ *  - Transparency - "opaque" event blocks time on calendar "transparent"
+ *                   event doesn't block time on calendar,
+ *                   default is "opaque"
+ *  - PrivateCopy - (TRUE/FALSE)
+ *
+ * @param string $calendar_id
+ *   The calendar to add this event to.
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ *
+ * @return boolean
+ *   FALSE, in the case of error.
+ */
+function gcal_event_create($event, $calendar_id, $account_id, $by_name = TRUE) {
+  if (!is_array($event)) {
+    drupal_set_message(t("Please pass array of attributes to create function"));
+    return FALSE;
+  }
+  if (!isset($event['Start']) || !isset($event['End'])) {
+    drupal_set_message(t("Invalid start or end date of the event"), 'error');
+    return FALSE;
+  }
+  if (!isset($event['Timezone'])) {
+    drupal_set_message(t("Set a valid Timezone"), 'error');
+    return FALSE;
+  }
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  $start = $event['Start'];
+  $end = $event['End'];
+  $timestamp = strtotime($start);
+  $start = date('Y-m-d\TH:i:s', $timestamp);
+  $timestamp = strtotime($end);
+  $end = date('Y-m-d\TH:i:s', $timestamp);
+  $event['Start'] = new Google_EventDateTime();
+  $event['Start']->setDateTime($start);
+  $event['Start']->setTimeZone($event['Timezone']);
+  $event['End'] = new Google_EventDateTime();
+  $event['End']->setDateTime($end);
+  $event['End']->setTimeZone($event['Timezone']);
+  if (isset($event['OriginalStartTime'])) {
+    $timestamp = strtotime($event['OriginalStartTime']);
+    $event['OriginalStartTime'] = new Google_EventDateTime();
+    $event['OriginalStartTime']->setDateTime(date('Y-m-d\TH:i:s', $timestamp));
+    $event['OriginalStartTime']->setTimeZone($event['Timezone']);
+  }
+  if (isset($event['Reminders'])) {
+    $google_reminder = array();
+    foreach ($event['Reminders'] as $key => $reminder) {
+      if (isset($reminder['minutes'])) {
+        $google_reminder[$key] = new Google_EventReminder();
+        $google_reminder[$key]->setMinutes($reminder['minutes']);
+        $google_reminder[$key]->setMethod(isset($reminder['method']) ? $reminder['method'] : 'email');
+      }
+    }
+    $event['Reminders'] = new Google_EventReminders();
+    $event['Reminders']->setOverrides($google_reminder);
+    $event['Reminders']->setUseDefault(FALSE);
+  }
+  if (isset($event['Creator'])) {
+    $creator = $event['Creator'];
+    $event['Creator'] = new Google_EventCreator();
+    if (isset($creator['Creator']['DisplayName'])) {
+      $event['Creator']->setDisplayName($creator['DisplayName']);
+    }
+    if (isset($creator['Creator']['Email'])) {
+      $event['Creator']->setEmail($creator['Email']);
+    }
+  }
+  if (isset($event['Recurrence']) && is_array($event['Recurrence'])) {
+    $recurrence = $event['Recurrence'];
+    $event['Recurrence'] = array();
+    $event['Recurrence'][0] = "RRULE:";
+    if (!isset($recurrence['Frequency'])) {
+      drupal_set_message(t("Frequency is required to make event recurring"), "error");
+      return FALSE;
+    }
+    $event['Recurrence'][0] .= "FREQ=" . $recurrence['Frequency'] . ";";
+    if (isset($recurrence['Byday'])) {
+      $event['Recurrence'][0] .= "BYDAY=" . (is_array($recurrence['Byday']) ? explode(",", $recurrence['Byday']) : $recurrence['Byday']) . ";";
+    }
+    if (isset($recurrence['Count'])) {
+      $event['Recurrence'][0] .= "COUNT=" . $recurrence['Count'] . ";";
+    }
+    if (isset($recurrence['Until'])) {
+      $event['Recurrence'][0] .= "UNTIL=" . $recurrence['Until'] . ";";
+    }
+  }
+  if (isset($event['Attendees']) && is_array($event['Attendees'])) {
+    $event_attendees = array();
+    $attributes = gcal_event_attendee_attributes();
+    foreach ($event['Attendees'] as $at_id => $attendee) {
+      if (!isset($attendee['Email'])) {
+        drupal_set_message(t("Email is Required to register a attendee"), "error");
+      }
+      else {
+        $attendee = array_intersect_key($attendee, $attributes);
+        $event_attendees[$at_id] = new Google_EventAttendee();
+        foreach ($attendee as $key => $val) {
+          $event_attendees[$at_id]->$attributes[$key]($val);
+        }
+      }
+    }
+    if (!empty($event_attendees)) {
+      $event['Attendees'] = $event_attendees;
+    }
+    else {
+      unset($event['Attendees']);
+    }
+  }
+  unset($event['Timezone']);
+  $new_event = new Google_Event();
+  $attributes = gcal_event_attributes();
+  unset($attributes['Id']);
+  // Clean array before passing it if user has passed any unwanted indexes.
+  $event = array_intersect_key($event, $attributes);
+  foreach ($event as $attr => $val) {
+    $new_event->$attributes[$attr]($val);
+  }
+  $new_event = $gcs->events->insert($calendar_id, $new_event);
+  return  $new_event ? $new_event : FALSE;
+}
+/**
+ * Update an event.
+ *
+ * @param array $event
+ *   Event data in an array containing:
+ *  - Id - Required - The event id which needs to be updated
+ *  - Other attributes are the same as event create.
+ *
+ * @param string $calendar_id
+ *   The calendar id to add this event to.
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ *
+ * @return boolean
+ *   FALSE, in the case of error.
+ */
+function gcal_event_update($event, $calendar_id, $account_id, $by_name = TRUE) {
+  if (!is_array($event)) {
+    drupal_set_message(t("Please pass array of attributes to update function"));
+    return FALSE;
+  }
+  if (!isset($event['Id'])) {
+    drupal_set_message(t("Set event id of the event"), 'error');
+    return FALSE;
+  }
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  if (isset($event['Start'])) {
+    $start = $event['Start'];
+    $timestamp = strtotime($start);
+    $start = date('Y-m-d\TH:i:s', $timestamp);
+    $event['Start'] = new Google_EventDateTime();
+    $event['Start']->setDateTime($start);
+    $event['Start']->setTimeZone($event['Timezone']);
+  }
+  if (isset($event['End'])) {
+    $end = $event['End'];
+    $timestamp = strtotime($end);
+    $end = date('Y-m-d\TH:i:s', $timestamp);
+    $event['End'] = new Google_EventDateTime();
+    $event['End']->setDateTime($end);
+    $event['End']->setTimeZone($event['Timezone']);
+  }
+  if (isset($event['OriginalStartTime'])) {
+    $timestamp = strtotime($event['OriginalStartTime']);
+    $event['OriginalStartTime'] = new Google_EventDateTime();
+    $event['OriginalStartTime']->setDateTime(date('Y-m-d\TH:i:s', $timestamp));
+    $event['OriginalStartTime']->setTimeZone($event['Timezone']);
+  }
+  if (isset($event['Reminders'])) {
+    $google_reminder = array();
+    foreach ($event['Reminders'] as $key => $reminder) {
+      if (isset($reminder['minutes'])) {
+        $google_reminder[$key] = new Google_EventReminder();
+        $google_reminder[$key]->setMinutes($reminder['minutes']);
+        $google_reminder[$key]->setMethod(isset($reminder['method']) ? $reminder['method'] : 'email');
+      }
+    }
+    $event['Reminders'] = new Google_EventReminders();
+    $event['Reminders']->setOverrides($google_reminder);
+    $event['Reminders']->setUseDefault(FALSE);
+  }
+  if (isset($event['Creator'])) {
+    $creator = $event['Creator'];
+    $event['Creator'] = new Google_EventCreator();
+    if (isset($creator['Creator']['DisplayName'])) {
+      $event['Creator']->setDisplayName($creator['DisplayName']);
+    }
+    if (isset($creator['Creator']['Email'])) {
+      $event['Creator']->setEmail($creator['Email']);
+    }
+  }
+  if (isset($event['Recurrence']) && is_array($event['Recurrence'])) {
+    $recurrence = $event['Recurrence'];
+    $event['Recurrence'] = array();
+    $event['Recurrence'][0] = "RRULE:";
+    if (!isset($recurrence['Frequency'])) {
+      drupal_set_message(t("Frequency is required to make event recurring"), "error");
+      return FALSE;
+    }
+    $event['Recurrence'][0] .= "FREQ=" . $recurrence['Frequency'] . ";";
+    if (isset($recurrence['Byday'])) {
+      $event['Recurrence'][0] .= "BYDAY=" . (is_array($recurrence['Byday']) ? explode(",", $recurrence['Byday']) : $recurrence['Byday']) . ";";
+    }
+    if (isset($recurrence['Count'])) {
+      $event['Recurrence'][0] .= "COUNT=" . $recurrence['Count'] . ";";
+    }
+    if (isset($recurrence['Until'])) {
+      $event['Recurrence'][0] .= "UNTIL=" . $recurrence['Until'] . ";";
+    }
+  }
+  // This global variable is of google client library.
+  global $apiConfig;
+  $oldconfig = isset($apiConfig['use_objects']) ? $apiConfig['use_objects'] : FALSE;
+  $apiConfig['use_objects'] = TRUE;
+  $new_event = gcal_event_get($calendar_id, $event['Id'], $account_id, $by_name);
+  $apiConfig['use_objects'] = $oldconfig;
+  if (isset($event['Attendees']) && is_array($event['Attendees'])) {
+    $attributes = gcal_event_attendee_attributes();
+    $attendees = $new_event->getAttendees();
+    foreach ($event['Attendees'] as $at_id => $attendee) {
+      if (!isset($attendee['Email'])) {
+        drupal_set_message(t("Email is Required to register a attendee"), "error");
+      }
+      else {
+        $attendee = array_intersect_key($attendee, $attributes);
+        $event_attendee = new Google_EventAttendee();
+        foreach ($attendee as $key => $val) {
+          $event_attendee->$attributes[$key]($val);
+        }
+        array_push($attendees, $event_attendee);
+      }
+    }
+    $event['Attendees'] = $attendees;
+  }
+  $attributes = gcal_event_attributes();
+  // Clean array before passing it if user has passed any unwanted indexes.
+  $event = array_intersect_key($event, $attributes);
+  foreach ($event as $attr => $val) {
+    $new_event->$attributes[$attr]($val);
+  }
+  $up_event = $gcs->events->update($calendar_id, $event['Id'], $new_event);
+  return $up_event ? $up_event : FALSE;
+}
+
+/**
+ * Delete a event.
+ *
+ * @param string $event_id
+ *   The event id which is to be deleted
+ *
+ * @param string $calendar_id
+ *   The calendar id which has event to be deleted
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ */
+function gcal_event_delete($event_id, $calendar_id, $account_id, $by_name = TRUE) {
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  $gcs->events->delete($calendar_id, $event_id);
+}
+
+/**
+ * Get the Event.
+ *
+ * @param string $calendar_id
+ *   Calendar id having the event
+ *
+ * @param string $event_id
+ *   Event id of the event to fetch.
+ *   Pass a blank value to get all events of the calendar.
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ *
+ * @return array
+ *   Array of event details
+ *   All attributes of the event declared in gcal_event_attributes().
+ */
+function gcal_event_get($calendar_id, $event_id, $account_id, $by_name = TRUE) {
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  $event = $gcs->events->get($calendar_id, $event_id);
+
+  return $event ? $event : FALSE;
+}
+
+/**
+ * Move the Event to another calendar.
+ *
+ * @param string $source_calendar_id
+ *   Calendar id of the source calendar
+ *
+ * @param string $event_id
+ *   event id of the event.
+ *
+ * @param string $dest_calendar_id
+ *   Calendar id of the destination calendar
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ *
+ * @return array
+ *   Array of event details
+ *   Event array with few basic attributes are returned
+ */
+function gcal_event_move($source_calendar_id, $event_id, $dest_calendar_id, $account_id, $by_name = TRUE) {
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  $event = $gcs->events->move($source_calendar_id, $event_id, $dest_calendar_id);
+
+  return $event ? $event : FALSE;
+}
+
+/**
+ * Creates an event based on a simple text string.
+ *
+ * @param string $calendar_id
+ *   Calendar id of the calendar where the event will be created.
+ *
+ * @param string $text
+ *   The text describing the event to be created.
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ *
+ * @return array
+ *   Array of event details
+ *   Event array with few basic attributes are returned
+ */
+function gcal_event_quickadd($calendar_id, $text, $account_id, $by_name = TRUE) {
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  $event = $gcs->events->quickAdd($calendar_id, $text);
+
+  return $event ? $event : FALSE;
+}
+
+/**
+ *  Returns free/busy information for calendar by searching event (find event).
+ *
+ * @param array $params
+ *   Array of parameters on which event will be searched.
+ *   TimeMin - Required - The start interval of the query search.
+ *                        eg '2012-12-24 12:30:00'
+ *   TimeMax - Required - The end interval of the query search.
+ *                        eg '2012-12-24 12:30:00'
+ *   TimeZone - Required = The time zone of the start and end interval.
+ *   CalendarExpansionMax - Maximal number of calendars for Free Busy info.
+ *   GroupExpansionMax - Maximal number of calendar ids to be provided for
+ *                       single group.
+ *   Items - Array of calendar ids to search in for events.
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ *
+ * @return array
+ *   Array of event details
+ *   Event array with few basic attributes are returned
+ */
+function gcal_freebusy($params, $account_id, $by_name = TRUE) {
+  if (!is_array($params)) {
+    drupal_set_message(t("Please pass array of params"));
+    return FALSE;
+  }
+  if (!isset($params['TimeMin']) || !isset($params['TimeMax'])) {
+    drupal_set_message(t("Invalid start or end time for the search query"), 'error');
+    return FALSE;
+  }
+  if (!isset($params['TimeZone'])) {
+    drupal_set_message(t("Set a valid Timezone"), 'error');
+    return FALSE;
+  }
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  $start = $params['TimeMin'];
+  $end = $params['TimeMax'];
+
+  $origin_dtz = new DateTimeZone('UTC');
+  $remote_dtz = new DateTimeZone($params['TimeZone']);
+  $origin_dt = new DateTime("now", $origin_dtz);
+  $remote_dt = new DateTime("now", $remote_dtz);
+  $offset = $origin_dtz->getOffset($origin_dt) - $remote_dtz->getOffset($remote_dt);
+
+  $timestamp = strtotime($start);
+  $start = date('Y-m-d\TH:i:s', $timestamp);
+  $start .= ($offset < 0 ? '-' . gmdate("H:i", $offset) : '+' . gmdate("H:i", $offset));
+
+  $timestamp = strtotime($end);
+  $end = date('Y-m-d\TH:i:s', $timestamp);
+  $end .= ($offset < 0 ? '-' . gmdate("H:i", $offset) : '+' . gmdate("H:i", $offset));
+
+  $params['TimeMin'] = $start;
+  $params['TimeMax'] = $end;
+  foreach ($params['Items'] as $key => $val) {
+    $params['Items'][$key] = new Google_FreeBusyRequestItem();
+    $params['Items'][$key]->setId($val);
+  }
+  $attributes = gcal_freebusy_attributes();
+  // Clean array before passing it if user has passed any unwanted indexes.
+  $params = array_intersect_key($params, $attributes);
+  $freebusy = new Google_FreeBusyRequest();
+  foreach ($params as $attr => $val) {
+    $freebusy->$attributes[$attr]($val);
+  }
+  $search = $gcs->freebusy->query($freebusy);
+
+  return $search ? $search : FALSE;
+}
+/** Event api functions end **/
+
+/** Acl api functions start **/
+/**
+ * Create a ACL.
+ *
+ * @param array $acl
+ *   An array of acl values
+ *  - scopeType  - Required
+ *    Possible values are: default - The public scope,
+ *                         user - limits the scope to single user,
+ *                         group - limits the scope to a group,
+ *                         domain - limits scope to a domain.
+ *
+ *  - scopeValue - required if scope type is not default,
+ *                  email address of the user or group,
+ *                  name of the domain in case of domain,
+ *                  ommitted in case of default scopeType
+ *
+ *  - role - Role of the viewer. Possible values are
+ *     'freeBusyReader' provides read access to free/busy info,
+ *     'reader' - provides read access to calendars,
+ *               Private events will appear, but details will be hidden.
+ *     'writer' provides read/write access and
+ *              event details are visible and editable
+ *     'owner' provides owner access to calendar and can manipulate ACL's
+ *
+ *
+ * @param string $calendar_id
+ *   Id of the calendar.
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ *
+ * @return array
+ *   Array of acl details
+ */
+function gcal_acl_create($acl, $calendar_id, $account_id, $by_name = TRUE) {
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  if (!isset($acl['scopeType'])) {
+    drupal_set_message(t("Pass scopeType to the acl create function"), 'error');
+    return FALSE;
+  }
+  if (!in_array($acl['scopeType'], array('default', 'user', 'group', 'domain'))) {
+    drupal_set_message(t("Invalid scopeType passed to the acl create function"), 'error');
+    return FALSE;
+  }
+  $scope = new Google_AclRuleScope();
+  $scope->setType($acl['scopeType']);
+  if ($acl['scopeType'] != 'default' && !isset($acl['scopeValue'])) {
+    drupal_set_message(t("No scopeValue passed to the acl create function"), 'error');
+    return FALSE;
+  }
+  if (isset($acl['scopeValue'])) {
+    $scope->setValue($acl['scopeValue']);
+  }
+  else {
+    $scope->setValue("");
+  }
+  $rule = new Google_AclRule();
+  $rule->setScope($scope);
+  if (isset($acl['role'])) {
+    if (!in_array($acl['role'],
+        array('freeBusyReader', 'reader', 'writer', 'owner'))) {
+      drupal_set_message(t("Invalid role passed to the acl create function"), 'error');
+      return FALSE;
+    }
+    $rule->setRole($acl['role']);
+  }
+  $createdrule = $gcs->acl->insert($calendar_id, $rule);
+  return is_array($createdrule) ? $createdrule : FALSE;
+}
+
+/**
+ * Delete a ACL.
+ *
+ * @param string $calendar_id
+ *   The calendar id
+ *
+ * @param string $rule_id
+ *   The rule id of rule which is to be deleted
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ */
+function gcal_acl_delete($calendar_id, $rule_id, $account_id, $by_name = TRUE) {
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  return $gcs->acl->delete($calendar_id, $rule_id);
+}
+
+/**
+ * Get the ACL.
+ *
+ * @param string $calendar_id
+ *   The calendar id which has acl to be fetched
+ *
+ * @param string $rule_id
+ *   The rule id is to be fetched. Pass ''(blank value) to fetch a rules list
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ *
+ * @return array
+ *   Array of calendar
+ *   A calendar array having kind, etag, id, summary(title),
+ *                          timeZone of the calendar.
+ */
+function gcal_acl_get($calendar_id, $rule_id, $account_id, $by_name = TRUE) {
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  $acl = $gcs->acl->get($calendar_id, $rule_id);
+
+  return $acl ? $acl : FALSE;
+}
+/** Calendar ACL functions end **/
+
+/** Calendar List api functions start **/
+/**
+ * Create a calendarList.
+ *
+ * @param array $calendarlist
+ *   An array of calendarlist values.
+ *   An array of calendarlist values.
+ *  - Id - Required - Id of the calendarlist.
+ *  - Summary - Title of the calendarlist Entry.
+ *  - Description - Description for the calendarlist.
+ *  - Location - Geographic Location of the calendarList.
+ *  - TimeZone - Timezone for the calendar. eg Asia/Calculta.
+ *  - ForegroundColor - color formatted in html eg #9fc6e7.
+ *  - DefaultReminders - The default reminder settings of calendar.
+ *                       Array of reminders time and reminder method
+ *    eg array(0 => array('minutes' => '60', 'method' => 'email'), 1 => .....)
+ *    (60 minutes before event starts) (email or sms for reminder method)
+ *
+ *  - ColorId - Color Id for the calendarlist.
+ *  - Selected - Whether calendar contents shows in UI. Default value if FALSE
+ *  - BackgroundColor - color formatted in html eg #9fc6e7.
+ *  - SummaryOverride - The Summary set by authenticated user for this calendar.
+ *  - Hidden - Whether the calendar has been hidden from the list.
+ *             Default is FALSE.
+ *  - AccessRole - The effective access role that the authenticated user has.
+ *                 Possible values are:
+ *                'freeBusyReader' provides read access to free/busy info,
+ *                'reader' - provides read access to calendars,
+ *                       Private events will appear, but details will be hidden.
+ *                'writer' provides read/write access and
+ *                         event details are visible and editable
+ *                'owner' provides owner access to calendar and
+ *                        can manipulate ACL's
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ *
+ * @return array
+ *   Array of calendar list
+ *   id - Unique id of the calendar (can be used for further operations)
+ *   etag -  Etag of the calendar
+ *   kind - Kind (usually calendar)
+ *   summary - Summary set for the calendar
+ */
+function gcal_calendarList_create($calendarlist, $account_id, $by_name = TRUE) {
+  if (!is_array($calendarlist)) {
+    drupal_set_message(t("Please pass array of attributes to update function"));
+    return FALSE;
+  }
+  if (!isset($calendarlist['Id'])) {
+    drupal_set_message(t("Please set the id for the calendar"), 'error');
+    return FALSE;
+  }
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  $cal = new Google_CalendarListEntry();
+  if (isset($calendarlist['DefaultReminders'])) {
+    $google_reminder = array();
+    foreach ($calendarlist['DefaultReminders'] as $key => $reminder) {
+      if (isset($reminder['minutes'])) {
+        $google_reminder[$key] = new Google_EventReminder();
+        $google_reminder[$key]->setMinutes($reminder['minutes']);
+        $google_reminder[$key]->setMethod(isset($reminder['method']) ? $reminder['method'] : 'email');
+      }
+    }
+    $calendarlist['DefaultReminders'] = $google_reminder;
+  }
+  $attributes = gcal_calendarlist_attributes();
+  // Clean array before passing it if user has passed any unwanted indexes.
+  $calendarlist = array_intersect_key($calendarlist, $attributes);
+  foreach ($calendarlist as $attr => $val) {
+    $cal->$attributes[$attr]($val);
+  }
+  $new_cal = $gcs->calendarList->insert($cal);
+  return $new_cal;
+}
+
+/**
+ * Update a calendarList.
+ *
+ * @param array $calendarlist
+ *   An array of calendarlist values.
+ *  - Id - Required - Id of the calendar to be updated.
+ *  - Summary - Title of the calendarlist Entry.
+ *  - Description - Description for the calendarlist.
+ *  - Location - Geographic Location of the calendarList.
+ *  - TimeZone - Timezone for the calendar. eg Asia/Calculta.
+ *  - ForegroundColor - color formatted in html eg #9fc6e7.
+ *  - DefaultReminders - The default reminder settings of calendar.
+ *                       Array of reminders time and reminder method
+ *    eg array(0 => array('minutes' => '60', 'method' => 'email'), 1 => .....)
+ *    (60 minutes before event starts) (email or sms for reminder method)
+ *
+ *  - ColorId - Color Id for the calendarlist.
+ *  - Selected - Whether calendar contents shows in UI. Default value if FALSE
+ *  - BackgroundColor - color formatted in html eg #9fc6e7.
+ *  - SummaryOverride - The Summary set by authenticated user for this calendar.
+ *  - Hidden - Whether the calendar has been hidden from the list.
+ *             Default is FALSE.
+ *  - AccessRole - The effective access role that the authenticated user has.
+ *                 Possible values are:
+ *                'freeBusyReader' provides read access to free/busy info,
+ *                'reader' - provides read access to calendars,
+ *                       Private events will appear, but details will be hidden.
+ *                'writer' provides read/write access and
+ *                         event details are visible and editable
+ *                'owner' provides owner access to calendar and
+ *                        can manipulate ACL's
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ *
+ * @return array
+ *   Array of calendarlist attributes or FALSE if failed
+ */
+function gcal_calendarlist_update($calendarlist, $account_id, $by_name = TRUE) {
+  if (!is_array($calendarlist)) {
+    drupal_set_message(t("Please pass array of attributes to update function"));
+    return FALSE;
+  }
+  if (!isset($calendarlist['Id'])) {
+    drupal_set_message(t("Please set the id for the calendar"), 'error');
+    return FALSE;
+  }
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  // This global variable is of google client library.
+  global $apiConfig;
+  $oldconfig = isset($apiConfig['use_objects']) ? $apiConfig['use_objects'] : FALSE;
+  $apiConfig['use_objects'] = TRUE;
+  $cal = gcal_calendarlist_get($calendarlist['Id'], $account_id, $by_name);
+  $apiConfig['use_objects'] = $oldconfig;
+  if (isset($calendarlist['DefaultReminders'])) {
+    $reminders = $cal->getDefaultReminders();
+    foreach ($calendarlist['DefaultReminders'] as $key => $reminder) {
+      if (isset($reminder['minutes'])) {
+        $google_reminder = new Google_EventReminder();
+        $google_reminder->setMinutes($reminder['minutes']);
+        $google_reminder->setMethod(isset($reminder['method']) ? $reminder['method'] : 'email');
+        array_push($reminders, $google_reminder);
+      }
+    }
+    $calendarlist['DefaultReminders'] = $reminders;
+  }
+  $attributes = gcal_calendarlist_attributes();
+  // Clean array before passing it if user has passed any unwanted indexes.
+  $calendarlist = array_intersect_key($calendarlist, $attributes);
+
+  foreach ($calendarlist as $attr => $val) {
+    $cal->$attributes[$attr]($val);
+  }
+  $new_cal = $gcs->calendarList->update($calendarlist['Id'], $cal);
+  return $new_cal;
+}
+
+/**
+ * Delete a calendarList.
+ *
+ * @param string $calendarlist_id
+ *   The calendar id which is to be deleted
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ */
+function gcal_calendarlist_delete($calendarlist_id, $account_id, $by_name = TRUE) {
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  $gcs->calendars->delete($calendarlist_id);
+}
+
+/**
+ * Get the calendarList.
+ *
+ * @param string $calendar_id
+ *   The calendar id which is to be fetched. Pass blank string to get a list.
+ *
+ * @param string $account_id
+ *   Name or id of google_oauth2 account
+ *
+ * @return array
+ *   Array of calendar
+ *   A calendar array having kind, etag, id, summary(title),
+ *                          timeZone etc attributes of the calendar.
+ */
+function gcal_calendarlist_get($calendar_id, $account_id, $by_name = TRUE) {
+  $gcs = gcal_calendar_object($account_id, $by_name);
+  if (!$gcs) {
+    return FALSE;
+  }
+  $cal_list = $gcs->calendarList->get($calendar_id);
+
+  return $cal_list ? $cal_list : FALSE;
+}
+/** Calendar List api functions end **/

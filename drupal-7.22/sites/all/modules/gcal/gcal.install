@@ -1,0 +1,10 @@
+<?php
+/**
+ * @file
+ * Update function for the gcal module.
+ */
+
+function gcal_update_7000() {
+  db_query('DROP TABLE {gcal_accounts}');
+  return t('Dropped gcal_accounts table');
+}
