@@ -1,0 +1,64 @@
+<?php
+
+function displayCalendarEvents()
+{
+    libraries_load("google-api-php-client");
+
+    ?>
+    <table>
+    <?php
+        $events = getCalendarEvents();   
+        $eventListSize = sizeof($events);
+        for ($i=0; $i < $eventListSize; $i++) { 
+            $event = $events[$i]; ?>
+            <tr><td><?php print$event['summary']; ?></td></tr>
+        <?php } ?>
+    </table>
+<?php
+
+}
+
+function getCalendarEvents()
+{
+
+    $calendarID = 'crkkh6hgfvhi2caqagqcea5ef8@group.calendar.google.com';
+
+    $timeMax = $timeMin =  getdate();
+    $timeMax['year'] = $timeMax['year'] + 1;
+    $timeMin['mday'] = $timeMin['mday'] - 1; 
+    $timeMax['RFC3339'] = $timeMax['year'].'-'.$timeMax['mon'].'-'.$timeMax['mday'].'T00:00:00Z';
+    $timeMin['RFC3339'] = $timeMin['year'].'-'.$timeMin['mon'].'-'.$timeMax['mday'].'T00:00:00Z';
+
+    $calendarParams = array(
+            'orderBy' => 'startTime', 
+            'singleEvents' => 'true', 
+            'timeMin' => $timeMin['RFC3339'],
+            'timeMax' => $timeMax['RFC3339']
+        );
+
+
+    $client = initGoogleClient();
+
+
+    $calendarService = new Google_CalendarService($client);
+    $eventService = $calendarService->events;
+
+    $eventResponse = $eventService->listEvents($calendarID,$calendarParams);
+    
+    return $eventResponse['items'];
+
+}
+
+
+function initGoogleClient()
+{
+    $client = new Google_Client();
+    $client->setApplicationName("Google Calendar For P-Space");
+    $client->setClientId('183877988543.apps.googleusercontent.com');
+    $client->setClientSecret('YElk21V-uKV7g9M23Lx9pTaf');
+    $client->setRedirectUri('http://localhost/drupal-7.22/gauth/response_handler');
+    $client->setDeveloperKey('AIzaSyDBRhJh8stCIS4yGETVCGWBbRQep_I-oLU');
+
+    return $client;
+}
+?>
