@@ -1,27 +1,44 @@
 <?php
 
+function calendarEventHandler()
+{
+    libraries_load("google-api-php-client");   
+    
+    if(empty($_GET['action']))
+        displayCalendarEvents();
+    else if($_GET['action'] == 'delete')
+    {
+        deleteCalendarEvent($_GET['eid']);
+        header('Location: calendar');
+    }
+}
+
+
 function displayCalendarEvents()
 {
-    libraries_load("google-api-php-client");
 
-    ?>
-    <table>
-    <?php
+    $role = user_access('access administration pages');
+    print "<div id='calendarContainer'>
+         <table id ='calendarTable'>
+        <thead><th>Ημερομηνία</th><th>Event</th></thead>";
+    
         $events = getCalendarEvents();   
         $eventListSize = sizeof($events);
-        for ($i=0; $i < $eventListSize; $i++) { 
-            $event = $events[$i]; ?>
-            <tr><td><?php print$event['summary']; ?></td></tr>
-        <?php } ?>
-    </table>
-<?php
 
+        for ($i=0; $i < $eventListSize; $i++) 
+        { 
+            $event = $events[$i];
+            printEvent($event,$role);
+        } 
+    print "</table></div>";
+    displayNewEventForm();
 }
 
 function getCalendarEvents()
 {
 
-    $calendarID = 'crkkh6hgfvhi2caqagqcea5ef8@group.calendar.google.com';
+    //$calendarID = 'crkkh6hgfvhi2caqagqcea5ef8@group.calendar.google.com';
+    $calendarID = 'nikos_l0st@live.com';
 
     $timeMax = $timeMin =  getdate();
     $timeMax['year'] = $timeMax['year'] + 1;
@@ -36,11 +53,7 @@ function getCalendarEvents()
             'timeMax' => $timeMax['RFC3339']
         );
 
-
-    $client = initGoogleClient();
-
-
-    $calendarService = new Google_CalendarService($client);
+    $calendarService = initGoogleClient();
     $eventService = $calendarService->events;
 
     $eventResponse = $eventService->listEvents($calendarID,$calendarParams);
@@ -51,14 +64,116 @@ function getCalendarEvents()
 
 
 function initGoogleClient()
-{
+{  
     $client = new Google_Client();
     $client->setApplicationName("Google Calendar For P-Space");
-    $client->setClientId('183877988543.apps.googleusercontent.com');
-    $client->setClientSecret('YElk21V-uKV7g9M23Lx9pTaf');
-    $client->setRedirectUri('http://localhost/drupal-7.22/gauth/response_handler');
+    $client->setAccessType('offline');
+    $client->setClientId('183877988543-vdrs10s9andk25ois8akl6bdpusd9ogm.apps.googleusercontent.com');
+    $client->setClientSecret('opEOJLWJD-cGHHy3vo07DcQI');
+    $client->setRedirectUri('http://localhost/drupal-7.22/calendar');
     $client->setDeveloperKey('AIzaSyDBRhJh8stCIS4yGETVCGWBbRQep_I-oLU');
 
-    return $client;
+    $calendarService = new Google_CalendarService($client);
+
+    if (isset($_GET['logout'])) 
+    {
+     // logout: destroy token
+        unset($_SESSION['token']);
+        die('Logged out.');
+    }
+
+    if (isset($_GET['code'])) { // we received the positive auth callback, get the token and store it in session
+        $client->authenticate();
+        $_SESSION['token'] = $client->getAccessToken();
+    }
+
+    if (isset($_SESSION['token'])) { // extract token from session and configure client
+        $token = $_SESSION['token'];
+        $client->setAccessToken($token);
+    }
+
+    if (!$client->getAccessToken()) { // auth call to google
+        $authUrl = $client->createAuthUrl();
+        header("Location: ".$authUrl);
+        die;
+    }
+   
+    return $calendarService;
 }
+
+function parseDate($dateTime)
+{
+    /*$englishWeekdays= array('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
+    $greekWeekdays = array('Δευτέρα', 'Τρίτη', 'Τετάρτη', 'Πέμπτη', 'Παρασκευή', 'Σάββατο', 'Κυριακή');
+    $temp = explode($dateTime);
+    var_dump($temp);
+    $day = $greekWeekdays[array_search($temp[0], $englishWeekdays)];*/
+    
+    return $dateTime->format('l, d M Y');;    
+}
+
+function parseTime($dateTime)
+{
+    return $dateTime->format('H:i');
+}
+
+function printEvent($event,$isAdmin)
+{
+    $dateTime = $event['start']['dateTime'];
+    $dateTime = date_create_from_format('Y-m-d\TG:i:sP', $dateTime);
+    $date  = parseDate($dateTime);      
+    $startTime = parseTime($dateTime);
+
+    $dateTime = $event['end']['dateTime'];
+    $dateTime = date_create_from_format('Y-m-d\TG:i:sP', $dateTime);
+    $endTime = parseTime($dateTime);
+    print "<tr><td>".$date."<br>".$startTime.'-'.$endTime."</td>
+    <td><p class='summary'>".$event['summary']."</p>";
+
+    print "<div id='details'>"; 
+    if(isset($event['description']))
+    {
+        print "<p><b>Περιγραφή</b></p><p>".$event['description']."</p>"; 
+    }
+    if($isAdmin == true)
+    {
+        print "<p><a href='' eid='".$event['id']."' onclick='deleteEvent(this)'>Διαγραφή του Γεγονότος</a></p>";
+    }
+    print "</div></td></tr>";
+}
+
+function deleteCalendarEvent($eventID)
+{
+    //$calendarID = 'crkkh6hgfvhi2caqagqcea5ef8@group.calendar.google.com';
+    $calendarID = 'nikos_l0st@live.com';
+    $calendarService = initGoogleClient();
+    $calendarService->events->delete($calendarID,$eventID);
+}
+
+//Fix the time, display recurring event menu
+function displayNewEventForm()
+{
+    print "<div id='formheader'>
+        <h3 onclick='slideForm()'>Δημιουργία νέου γεγονότος</h3>
+    </div>
+    <div id='eventForm'>
+        <form> 
+            <table id = 'newEventTable'>
+                <tr><td>Τίτλος</td><td><input type='text' name='summary' required/></td></tr>
+                <tr><td>Ημερομηνία Έναρξης</td><td><input type='text' size ='7' class='datepicker' id='startDate' name ='startDate' required/></td></tr>
+                <tr><td>Ώρα Έναρξης</td><td></td></tr>
+                <tr><td>Ημερομηνία Λήξης</td><td><input type='text' size='7' class='datepicker' id ='endDate' name='endDate' required/></td></tr>
+                <tr><td>Ώρα Λήξης</td><td></td></tr>
+                <tr><td>Ολοήμερο</td><td><input type='checkbox' id='fullDay' name='fullDay'/></td></tr>
+                <tr><td>Επανάληψη</td><td><input type='checkbox' id='recurrence' name='fullday'/></td></tr>
+                <tr><td>Τοποθεσία</td><td><input type='text' size='25' name='location'/></td></tr>
+                <tr><td>Περιγραφή</td><td><textarea name='description' rows='4' form='eventForm'></textarea></td></tr>
+                <tr><td><input type='submit' name='createEvent'/></td><td></td></tr>
+            </table>
+        </form>
+    </div>";
+
+}
+
+
 ?>
