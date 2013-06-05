@@ -1,6 +1,0 @@
-name = calendarVis
-description = Google Calendar Visualization for P-space
-core = 7.x
-
-dependencies[] = libraries
-
