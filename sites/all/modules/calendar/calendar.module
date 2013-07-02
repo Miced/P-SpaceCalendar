@@ -4,13 +4,22 @@ function calendarEventHandler()
 {
     libraries_load("google-api-php-client");   
     
-    if(empty($_GET['action']))
+    if(empty($_GET['action']) && empty($_POST))
         displayCalendarEvents();
-    else if($_GET['action'] == 'delete')
+    else if(isset($_GET['action'])) 
     {
-        deleteCalendarEvent($_GET['eid']);
+        if($_GET['action'] == 'delete')
+        
+            deleteCalendarEvent($_GET['eid']);
+        
         header('Location: calendar');
     }
+    else if(isset($_POST['createEvent']))
+    {
+        insertCalendarEvent($_POST);
+        header('Location:calendar');
+    }
+
 }
 
 
@@ -18,19 +27,29 @@ function displayCalendarEvents()
 {
 
     $role = user_access('access administration pages');
-    print "<div id='calendarContainer'>
-         <table id ='calendarTable'>
-        <thead><th>Ημερομηνία</th><th>Event</th></thead>";
     
-        $events = getCalendarEvents();   
-        $eventListSize = sizeof($events);
-        //TODO:Display message if no events exist
+    $events = getCalendarEvents();   
+    $eventListSize = sizeof($events);
+
+    print "<div id='calendarContainer'>";
+
+    if($eventListSize == 0)
+    {
+        print "<h3>Δεν υπάρχουν καταχωρημένα γεγονότα στο ημερολόγιο!";
+    }
+    else
+    {
+        
+        print "<table id ='calendarTable'>
+        <thead><th>Ημερομηνία</th><th>Event</th></thead>";
         for ($i=0; $i < $eventListSize; $i++) 
         { 
             $event = $events[$i];
             printEvent($event,$role);
         } 
-    print "</table></div>";
+        print "</table>";
+    }
+    print "</div>";
     displayNewEventForm();
 }
 
@@ -61,7 +80,6 @@ function getCalendarEvents()
     return $eventResponse['items'];
 
 }
-
 
 function initGoogleClient()
 {  
@@ -103,31 +121,33 @@ function initGoogleClient()
 
 function parseDate($dateTime)
 {
-    /*$englishWeekdays= array('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
-    $greekWeekdays = array('Δευτέρα', 'Τρίτη', 'Τετάρτη', 'Πέμπτη', 'Παρασκευή', 'Σάββατο', 'Κυριακή');
-    $temp = explode($dateTime);
-    var_dump($temp);
-    $day = $greekWeekdays[array_search($temp[0], $englishWeekdays)];*/
-    
-    return $dateTime->format('l, d M Y');;    
+    $englishWeekdays= array('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
+    $greekWeekdays = array('Δευτέρα', 'Τρίτη', 'Τετάρτη', 'Πέμπτη', 'Παρασκευή', 'Σάββατο', 'Κυριακή');    
+
+    $englishMonths = array('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec');
+    $greekMonths = array('Ιαν','Φεβ','Μαρ','Απρ','Μαϊ','Ιουν','Ιουλ','Αυγ','Σεπ','Οκτ','Νοε','Δεκ');
+
+    $weekday = $dateTime->format('l');
+    $key = array_search($weekday, $englishWeekdays);
+    $weekday = $greekWeekdays[$key];
+
+    $day = $dateTime->format('d');
+    $month = $dateTime->format('M');
+    $key = array_search($month, $englishMonths);
+    $month = $greekMonths[$key];
+
+    $year = $dateTime->format('Y');
+    $date = $weekday.', '.$day.' '.$month.' '.$year;
+    return $date;
 }
 
-function parseTime($dateTime)
-{
-    return $dateTime->format('H:i');
-}
+function parseTime($dateTime){return $dateTime->format('H:i');}
 
 function printEvent($event,$isAdmin)
-{
-    $dateTime = $event['start']['dateTime'];
-    $dateTime = date_create_from_format('Y-m-d\TG:i:sP', $dateTime);
-    $date  = parseDate($dateTime);      
-    $startTime = parseTime($dateTime);
-
-    $dateTime = $event['end']['dateTime'];
-    $dateTime = date_create_from_format('Y-m-d\TG:i:sP', $dateTime);
-    $endTime = parseTime($dateTime);
-    print "<tr><td>".$date."<br>".$startTime.'-'.$endTime."</td>
+{   
+    $dateString = parseDateTime($event['start'],$event['end']);
+    
+    print "<tr><td>".$dateString."</td>
     <td><p class='summary'>".$event['summary']."</p>";
 
     print "<div id='details'>"; 
@@ -142,6 +162,38 @@ function printEvent($event,$isAdmin)
     print "</div></td></tr>";
 }
 
+function parseDateTime($start,$end)
+{
+    if(isset($start['date']))
+    {
+        $startDate = date_create_from_format('Y-m-d',$start['date']);
+        $endDate = date_create_from_format('Y-m-d',$end['date']);
+        $startDate = parseDate($startDate);
+        $endDate = parseDate($endDate);
+        if($startDate == $endDate)
+            $date = $startDate;
+        else
+            $date = $startDate.' έως '.$endDate;
+    }
+    else
+    {
+         $startDate = date_create_from_format('Y-m-d\TG:i:sP',$start['dateTime']);
+         $endDate = date_create_from_format('Y-m-d\TG:i:sP',$end['dateTime']);
+         $startTime = parseTime($startDate);
+         $endTime = parseTime($endDate);
+         $startDate = parseDate($startDate);
+         $endDate = parseDate($endDate);
+         $date = $startDate.' στις '.$startTime;
+         if($startDate == $endDate)
+         {
+            $date.=' έως '.$endTime;
+        }
+         else
+            $date.=' έως '.$endDate.' στις '.$endTime;
+    }
+    return $date;
+}
+
 function deleteCalendarEvent($eventID)
 {
     //$calendarID = 'crkkh6hgfvhi2caqagqcea5ef8@group.calendar.google.com';
@@ -150,14 +202,13 @@ function deleteCalendarEvent($eventID)
     $calendarService->events->delete($calendarID,$eventID);
 }
 
-//TODO:Fix the time, display recurring event menu
 function displayNewEventForm()
 {?>
     <div id='formheader'>
         <h3 id='newEventTitle'>Δημιουργία νέου γεγονότος</h3>
     </div>
     <div id='eventForm'>
-        <form> 
+        <form name='newEvent' action='calendar' method='post'> 
             <table id = 'newEventTable'>
                 <tr><td>Τίτλος</td><td><input type='text' size='25' name='summary' required/></td></tr>
                 <tr><td>Ημερομηνία Έναρξης</td><td><input type='text' size ='7' class='datepicker' id='startDate' name ='startDate' required/></td></tr>
@@ -168,23 +219,24 @@ function displayNewEventForm()
                 <tr><td>Επανάληψη</td><td><input type='checkbox' id='recurrence' name='recurrence'/></td></tr>
                 <tr><td>Τοποθεσία</td><td><input type='text' size='25' name='location'/></td></tr>
                 <tr><td>Περιγραφή</td><td><textarea name='description' rows='4' form='eventForm'></textarea></td></tr>
+                <tr><td>Αποστολή Προσκλήσεων</td><td><input type='checkbox' id='invite' name='invite'></td></tr>
                 <tr><td><input type='submit' value='Αποθήκευση Γεγονότος' name='createEvent'/></td><td></td></tr>
             </table>
             <div id="recurrenceForm">
                 <h4>Eπανάληψη</h4>
                 <table>
                     <tr><td>Επαναλήψεις:</td><td><select name='frequency'>
-                                                <option value='daily'>Καθημερινά</option>
-                                                <option value='weekly' selected>Εβδομαδιαία</option>
-                                                <option value='monthly'>Μηνιαία</option>
+                                                <option value='DAILY'>Καθημερινά</option>
+                                                <option value='WEEKLY' selected>Εβδομαδιαία</option>
+                                                <option value='MONTHLY'>Μηνιαία</option>
                                                 </select></td></tr>
-                    <tr><td>Επανάληψη Κάθε:</td><td><input name='days' type='checkbox' value='mon'>Δ
-                                                    <input name='days' type='checkbox' value='tue'>Τ
-                                                    <input name='days' type='checkbox' value='wed'>Τ
-                                                    <input name='days' type='checkbox' value='thu'>Π
-                                                    <input name='days' type='checkbox' value='fri'>Π
-                                                    <input name='days' type='checkbox' value='sat'>Σ
-                                                    <input name='days' type='checkbox' value='sun'>Κ
+                    <tr><td>Επανάληψη Κάθε:</td><td><input name='days[]' type='checkbox' value='MO'>Δ
+                                                    <input name='days[]' type='checkbox' value='TU'>Τ
+                                                    <input name='days[]' type='checkbox' value='WE'>Τ
+                                                    <input name='days[]' type='checkbox' value='TH'>Π
+                                                    <input name='days[]' type='checkbox' value='FR'>Π
+                                                    <input name='days[]' type='checkbox' value='SA'>Σ
+                                                    <input name='days[]' type='checkbox' value='SU'>Κ
                                                     </td></tr>
                     <tr><td>Λήγει:</td><td><input type='radio' name='expiration' value='never'/>Ποτέ<br>
                                             <input type='radio' name='expiration' value='after'/>Μετά από <input type="number" name="occurrences" min="1" /> εμφανίσεις<br></td></tr>
@@ -194,3 +246,99 @@ function displayNewEventForm()
     </div>
 
 <?php } ?>
+
+<?php
+
+
+function getWeekdayBYDAY($date)
+{
+
+    $englishWeekdays= array('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
+    $codedWeekdays = array('MO','TU','WE','TH','FR','SA','SU');
+
+    $date = $date->format('l');
+    $key = array_search($date, $englishWeekdays);
+    return $codedWeekdays[$key];
+}
+
+function insertCalendarEvent($data)
+{
+
+    $calendarID = 'nikos_l0st@live.com';
+    $calendarService = initGoogleClient();
+    $event = new Google_Event();
+    $event->setSummary($data['summary']);
+
+    if(isset($data['location']))
+        $event->setLocation($data['location']);
+    if(isset($data['description']))
+        $event->setDescription($data['description']);
+
+        
+        $startDate = new Google_EventDateTime();
+        $endDate = new Google_EventDateTime();
+        if(isset($data['fullDay']))
+        {
+            $startDate->setDate($data['startDate']);
+            $endDate ->setDate($data['endDate']);
+        }
+        else
+        {
+            $startDate->setDateTime($data['startDate']."T".$data['startTime'].":00Z");
+            $endDate->setDateTime($data['endDate']."T".$data['endTime'].":00Z");
+        }
+
+        $event->setStart($startDate);
+        $event->setEnd($endDate);
+        
+
+    if(isset($data['recurrence']))
+    {
+        $recurrenceDay = getWeekdayBYDAY(date_create_from_format('Y-m-d',$data['startDate']));
+        $recurrenceRule = "RRULE:FREQ=".$data['frequency'].";";
+        if($data['expiration'] == 'after')
+        {
+            $recurrenceRule.="COUNT:".$data['occurrences'].";";
+        }
+
+        if(isset($data['days']))
+        {
+            $days = implode(",", $data['days']);
+            $recurrenceRule.="BYDAY:".$days;          
+        }
+        else
+        {
+            $recurrenceRule.="BYDAY:".$recurrenceDay;
+        }
+
+        $event->setRecurrence(array($recurrenceRule));
+    }
+
+    $event->setAnyoneCanAddSelf(true);
+    $event->setGuestsCanInviteOthers(true);
+    $event->setGuestsCanSeeOtherGuests(true);
+
+    //TODO:Na ftiaksoume ta invitations
+    if(isset($data['invite']))
+    {
+
+        $ch = curl_init();
+
+        curl_setopt($ch, CURLOPT_URL, "https://www.google.com/m8/feeds/contacts/default/full");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER , true);
+
+        $response = curl_exec($ch);
+
+        curl_close($ch);
+
+        var_dump($response);
+
+    }
+    var_dump($data);
+    var_dump($event);
+    $optional['sendNotifications'] = true;
+    $calendarService->events->insert($calendarID,$event,$optional);
+
+}
+
+?>
