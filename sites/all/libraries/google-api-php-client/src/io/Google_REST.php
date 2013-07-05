@@ -48,6 +48,7 @@ class Google_REST {
    * @return mixed|null
    */
   public static function decodeHttpResponse($response) {
+
     $code = $response->getResponseHttpCode();
     $body = $response->getResponseBody();
     $decoded = null;

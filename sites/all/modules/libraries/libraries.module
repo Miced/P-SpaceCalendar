@@ -589,7 +589,7 @@ function libraries_detect($name) {
  */
 function libraries_load($name, $variant = NULL) {
   $loaded = &drupal_static(__FUNCTION__, array());
-
+  
   if (!isset($loaded[$name])) {
     $library = cache_get($name, 'cache_libraries');
     if ($library) {
