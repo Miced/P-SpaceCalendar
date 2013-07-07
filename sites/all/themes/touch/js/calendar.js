@@ -2,6 +2,9 @@ $(document).ready(function(){
       $("#newEventTitle").on('click',function(){ 
         $("#eventForm").slideToggle(700);
         $('html,body').animate({scrollTop: $("#eventForm").offset().top}, 700);});
+       $("#subscribeTitle").on('click',function(){ 
+        $("#subscribeForm").slideToggle(700);
+        $('html,body').animate({scrollTop: $("#eventForm").offset().top}, 700);});
   		$(".summary").each(function(){
         $(this).click(function(){
           $(this).next().slideToggle(300);});});

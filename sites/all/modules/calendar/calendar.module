@@ -3,7 +3,6 @@
 function calendarEventHandler()
 {
     libraries_load("google-api-php-client");  
-    var_dump($_GET); 
     if(empty($_GET['action']) && empty($_POST))
         displayCalendarEvents();
     else if(!empty($_GET['action'])) 
@@ -12,12 +11,20 @@ function calendarEventHandler()
         if($_GET['action'] == 'delete')
         {
             deleteCalendarEvent($_GET['eid']);
-            //header('Location: calendar');
+            header('Location: calendar');
         }
     }
     else if(isset($_POST['createEvent']))
     {
         insertCalendarEvent($_POST);
+        header('Location:calendar');
+    }
+    else if(isset($_POST['subscribeButton']))
+    {
+        if($_POST['subscribeButton'] == 'Εγγραφή')
+            insertNewSubscriber($_POST['e-mail']);
+        else
+            deleteSubscriber($_POST['e-mail']);
         header('Location:calendar');
     }
 
@@ -31,7 +38,7 @@ function displayCalendarEvents()
     
     $events = getCalendarEvents();   
     $eventListSize = sizeof($events);
-
+    
     print "<div id='calendarContainer'>";
 
     if($eventListSize == 0)
@@ -40,7 +47,6 @@ function displayCalendarEvents()
     }
     else
     {
-        
         print "<table id ='calendarTable'>
         <thead><th>Ημερομηνία</th><th>Event</th></thead>";
         for ($i=0; $i < $eventListSize; $i++) 
@@ -210,7 +216,7 @@ function displayNewEventForm()
     </div>
     <div id='eventForm'>
         <form name='newEvent' action='calendar' method='post'> 
-            <table id = 'newEventTable'>
+            <table id = 'formTable'>
                 <tr><td>Τίτλος</td><td><input type='text' size='25' name='summary' required/></td></tr>
                 <tr><td>Ημερομηνία Έναρξης</td><td><input type='text' size ='7' class='datepicker' id='startDate' name ='startDate' required/></td></tr>
                 <tr><td>Ώρα Έναρξης</td><td><input type='time' name='startTime' class='time' required/></td></tr>
@@ -246,6 +252,16 @@ function displayNewEventForm()
                                             <input type='radio' name='expiration' value='until'/>Στις <input type='text' size ='7' class='datepicker' name ='recurrenceEnd' disabled/></td></tr>
                 </table>
             </div>
+        </form>
+    </div>
+    <div id='formheader'>
+        <h3 id='subscribeTitle'>Εγγραφή/Διαγραφή Για Προσκλήσεις</h3>
+    </div>
+    <div id='subscribeForm'>
+        <form name='newSubscriber' method='post' action='calendar'>
+            <table id='formTable'>
+                <tr><td>Εισάγετε την διεύθυνση e-mail σας</td><td><input type='email' name='e-mail' size='25' name='summary' required/><input type='submit' value='Εγγραφή' name='subscribeButton'/><input type='submit' value='Διαγραφή' name='subscribeButton'/></td></tr>
+            </table>
         </form>
     </div>
 
@@ -345,35 +361,80 @@ function insertCalendarEvent($data)
 
         $event->setRecurrence(array($recurrenceRule));
     }
+   
+    
 
+    if(isset($data['invite']))
+    {
+        $xml = simplexml_load_file("sites/all/modules/calendar/contacts.xml");
+
+        $i = 0;
+
+        if($xml->count() > 0)
+        {
+            foreach ($xml->children() as $subscriber) 
+            {
+                $attendees[$i] = new Google_EventAttendee();
+                $attendees[$i]->setEmail($subscriber);
+            }
+
+            $event->attendees = $attendees;
+        }
+    }
+    
+    $event->setAttendeesOmitted(false);
     $event->setAnyoneCanAddSelf(true);
     $event->setGuestsCanInviteOthers(true);
     $event->setGuestsCanSeeOtherGuests(true);
-
-    //TODO:Na ftiaksoume ta invitations
-    if(isset($data['invite']))
-    {
-
-        $ch = curl_init();
-
-        curl_setopt($ch, CURLOPT_URL, "https://www.google.com/m8/feeds/contacts/default/full");
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER , true);
-
-        $response = curl_exec($ch);
-
-        curl_close($ch);
-
-        var_dump($response);
-
-    }
-    var_dump($data);
-    var_dump($event);
+    
     $optional = array();
 
     $eventService = $calendarService->events;
     $eventService->insert($calendarID,$event,$optional);
 }
 
+function insertNewSubscriber($email)
+{
+    $subscriptionFile=("sites/all/modules/calendar/contacts.xml");
+    $xml=simplexml_load_file($subscriptionFile);
+    $mailExists = false;
+
+    foreach ($xml->children() as $subscriber)
+    {
+        if($subscriber == $email)
+        {
+            $mailExists = true;
+            break;
+        }
+    }
+
+    if($mailExists == false)
+    {
+        $xml->addChild("subscriber",$email);
+        $xml->asXML($subscriptionFile);
+    }
+    
+}
+
+
+function  deleteSubscriber($email)
+{
+    $subscriptionFile = ("sites/all/modules/calendar/contacts.xml");
+    $xml = simplexml_load_file($subscriptionFile);
+    
+    foreach ($xml->children() as $subscriber) 
+    {
+        if($subscriber == $email)
+        {
+            $dom=dom_import_simplexml($subscriber);
+            $dom->parentNode->removeChild($dom);
+            break;
+        }
+        
+    }
+    $xml->asXML($subscriptionFile); 
+    var_dump($xml);
+}
 
 function uberdust_event_handler($startDate, $endDate)
 {

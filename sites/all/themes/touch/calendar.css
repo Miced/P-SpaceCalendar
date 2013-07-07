@@ -10,8 +10,6 @@ textarea{
 	overflow-y: auto;
 }
 
-
-
 #calendarTable{
 	table-layout: fixed;
 	border-collapse: collapse; 
@@ -23,12 +21,13 @@ textarea{
 }
 
 #formheader{
+	text-align: center;
 	margin: 0 auto;
 	margin-top: 25px;
 	width: 550px;
 }
 
-#eventForm{
+#eventForm,#subscribeForm{
 	margin: 0 auto;
 	margin-top: 25px;
 	width: 550px;
