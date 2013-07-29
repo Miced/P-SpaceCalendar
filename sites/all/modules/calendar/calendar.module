@@ -1,138 +1,206 @@
 <?php
 
-function calendarEventHandler()
-{
-    libraries_load("google-api-php-client");  
-    if(empty($_GET['action']) && empty($_POST))
-        displayCalendarEvents();
-    else if(!empty($_GET['action'])) 
-    {
-        var_dump("Working");
-        if($_GET['action'] == 'delete')
-        {
-            deleteCalendarEvent($_GET['eid']);
-            header('Location: calendar');
-        }
+/**
+ * Display help and module information
+ * @param path which path of the site we're displaying help
+ * @param arg array that holds the current path as would be returned from arg() function
+ * @return help text for the path
+ */
+function calendar_help($path, $arg) {
+    $output = '';  //declare your output variable
+    switch ($path) {
+	case "admin/help#calendar":
+	    $output = '<p>' . t("Organizes calendar events") . '</p>';
+	    break;
     }
-    else if(isset($_POST['createEvent']))
-    {
-        insertCalendarEvent($_POST);
-        header('Location:calendar');
-    }
-    else if(isset($_POST['subscribeButton']))
-    {
-        if($_POST['subscribeButton'] == 'Εγγραφή')
-            insertNewSubscriber($_POST['e-mail']);
-        else
-            deleteSubscriber($_POST['e-mail']);
-        header('Location:calendar');
-    }
-
+    return $output;
 }
 
+function calendar_menu() {
+    $items = array();
 
-function displayCalendarEvents()
-{
+    $items['admin/config/content/calendar'] = array(
+	'title' => 'Calendar',
+	'description' => 'Configuration for Calendar module',
+	'page callback' => 'drupal_get_form',
+	'page arguments' => array('calendar_form'),
+	'access arguments' => array('access administration pages'),
+	'type' => MENU_NORMAL_ITEM,
+    );
+
+    return $items;
+}
+
+function calendar_form($form, &$form_state) {
+    $form['calendar_id'] = array(
+	'#type' => 'textfield',
+	'#title' => t('Calendar ID'),
+	'#default_value' => variable_get('calendar_id'),
+	'#size' => 60,
+	'#description' => t('The ID of the Google Calendar of P-Space.'),
+	'#required' => TRUE,
+    );
+
+    $form['calendar_client_id'] = array(
+	'#type' => 'textfield',
+	'#title' => t('Client ID'),
+	'#default_value' => variable_get('calendar_client_id'),
+	'#size' => 60,
+	'#description' => t('The Client ID of the service account.'),
+	'#required' => TRUE,
+    );
+
+    $form['calendar_client_secret'] = array(
+	'#type' => 'textfield',
+	'#title' => t('Client Secret'),
+	'#default_value' => variable_get('calendar_client_secret'),
+	'#size' => 60,
+	'#description' => t('The Client Secret of the service account.'),
+	'#required' => TRUE,
+    );
+
+    $form['calendar_api_key'] = array(
+	'#type' => 'textfield',
+	'#title' => t('API key'),
+	'#default_value' => variable_get('calendar_api_key'),
+	'#size' => 60,
+	'#description' => t('The API access key (for server apps).'),
+	'#required' => TRUE,
+    );
+
+    $form['calendar_redirect_uri'] = array(
+	'#type' => 'textfield',
+	'#title' => t('Redirect_URI'),
+	'#default_value' => variable_get('calendar_redirect_uri'),
+	'#size' => 60,
+	'#description' => t('The URI of the page to redirect to after authorization.'),
+	'#required' => TRUE,
+    );
+
+    return system_settings_form($form);
+}
+
+function calendarEventHandler() {
+    //libraries_load("google-api-php-client");
+    require_once 'sites/all/libraries/google-api-php-client/src/Google_Client.php';
+    require_once 'sites/all/libraries/google-api-php-client/src/contrib/Google_CalendarService.php';
+    if (empty($_GET['action']) && empty($_POST))
+	displayCalendarEvents();
+    else if (!empty($_GET['action'])) {
+	if ($_GET['action'] == 'delete') {
+	    deleteCalendarEvent($_GET['eid']);
+	    header('Location: calendar');
+	}
+    } else if (isset($_POST['createEvent'])) {
+	insertCalendarEvent($_POST);
+	header('Location: calendar');
+    } else if (isset($_POST['subscribeButton'])) {
+	if ($_POST['subscribeButton'] == 'Εγγραφή')
+	    insertNewSubscriber($_POST['e-mail']);
+	else
+	    deleteSubscriber($_POST['e-mail']);
+	header('Location: calendar');
+    }
+}
+
+function displayCalendarEvents() {
 
     $role = user_access('access administration pages');
-    
-    $events = getCalendarEvents();   
+
+    $events = getCalendarEvents();
     $eventListSize = sizeof($events);
-    
+
     print "<div id='calendarContainer'>";
 
-    if($eventListSize == 0)
-    {
-        print "<h3>Δεν υπάρχουν καταχωρημένα γεγονότα στο ημερολόγιο!";
-    }
-    else
-    {
-        print "<table id ='calendarTable'>
+    if ($eventListSize == 0) {
+	print "<h3>Δεν υπάρχουν καταχωρημένα γεγονότα στο ημερολόγιο!";
+    } else {
+	print "<table id ='calendarTable'>
         <thead><th>Ημερομηνία</th><th>Event</th></thead>";
-        for ($i=0; $i < $eventListSize; $i++) 
-        { 
-            $event = $events[$i];
-            printEvent($event,$role);
-        } 
-        print "</table>";
+	for ($i = 0; $i < $eventListSize; $i++) {
+	    $event = $events[$i];
+	    printEvent($event, $role);
+	}
+	print "</table>";
     }
     print "</div>";
-    displayNewEventForm();
+    if ($role == true) {
+	displayNewEventForm();
+    }
 }
 
-function getCalendarEvents()
-{
+function getCalendarEvents() {
 
-    //$calendarID = 'crkkh6hgfvhi2caqagqcea5ef8@group.calendar.google.com';
-    $calendarID = 'nikos_l0st@live.com';
+    $calendarID = variable_get('calendar_id');
 
-    $timeMax = $timeMin =  getdate();
+    $timeMax = $timeMin = getdate();
     $timeMax['year'] = $timeMax['year'] + 1;
-    $timeMin['mday'] = $timeMin['mday'] - 1; 
-    $timeMax['RFC3339'] = $timeMax['year'].'-'.$timeMax['mon'].'-'.$timeMax['mday'].'T00:00:00Z';
-    $timeMin['RFC3339'] = $timeMin['year'].'-'.$timeMin['mon'].'-'.$timeMax['mday'].'T00:00:00Z';
+    $timeMin['mday'] = $timeMin['mday'] - 1;
+    $timeMax['RFC3339'] = $timeMax['year'] . '-' . $timeMax['mon'] . '-' . $timeMax['mday'] . 'T00:00:00Z';
+    $timeMin['RFC3339'] = $timeMin['year'] . '-' . $timeMin['mon'] . '-' . $timeMax['mday'] . 'T00:00:00Z';
 
     $calendarParams = array(
-            'orderBy' => 'startTime', 
-            'singleEvents' => 'true', 
-            'timeMin' => $timeMin['RFC3339'],
-            'timeMax' => $timeMax['RFC3339']
-        );
+	'orderBy' => 'startTime',
+	'singleEvents' => 'true',
+	'timeMin' => $timeMin['RFC3339'],
+	'timeMax' => $timeMax['RFC3339']
+    );
 
     $calendarService = initGoogleClient();
     $eventService = $calendarService->events;
 
-    $eventResponse = $eventService->listEvents($calendarID,$calendarParams);
-    
-    return $eventResponse['items'];
+    $eventResponse = $eventService->listEvents($calendarID, $calendarParams);
 
+    return $eventResponse['items'];
 }
 
-function initGoogleClient()
-{  
+function initGoogleClient() {
+    $clientID = variable_get('calendar_client_id');
+    $clientSecret = variable_get('calendar_client_secret');
+    $developerKey = variable_get('calendar_api_key');
+    $redirectUri = variable_get('calendar_redirect_uri');
+
     $client = new Google_Client();
     $client->setApplicationName("Google Calendar For P-Space");
     $client->setAccessType('offline');
-    $client->setClientId('183877988543-vdrs10s9andk25ois8akl6bdpusd9ogm.apps.googleusercontent.com');
-    $client->setClientSecret('opEOJLWJD-cGHHy3vo07DcQI');
-    $client->setRedirectUri('http://localhost/drupal-7.22/calendar');
-    $client->setDeveloperKey('AIzaSyDBRhJh8stCIS4yGETVCGWBbRQep_I-oLU');
+    $client->setClientId($clientID);
+    $client->setClientSecret($clientSecret);
+    $client->setRedirectUri($redirectUri);
+    $client->setDeveloperKey($developerKey);
 
     $calendarService = new Google_CalendarService($client);
 
-    if (isset($_GET['logout'])) 
-    {
-     // logout: destroy token
-        unset($_SESSION['token']);
-        die('Logged out.');
+    if (isset($_GET['logout'])) {
+	// logout: destroy token
+	unset($_SESSION['token']);
+	die('Logged out.');
     }
 
     if (isset($_GET['code'])) { // we received the positive auth callback, get the token and store it in session
-        $client->authenticate();
-        $_SESSION['token'] = $client->getAccessToken();
+	$client->authenticate();
+	$_SESSION['token'] = $client->getAccessToken();
     }
 
     if (isset($_SESSION['token'])) { // extract token from session and configure client
-        $token = $_SESSION['token'];
-        $client->setAccessToken($token);
+	$token = $_SESSION['token'];
+	$client->setAccessToken($token);
     }
 
     if (!$client->getAccessToken()) { // auth call to google
-        $authUrl = $client->createAuthUrl();
-        header("Location: ".$authUrl);
-        die;
+	$authUrl = $client->createAuthUrl();
+	header("Location: " . $authUrl);
+	die;
     }
-   
+
     return $calendarService;
 }
 
-function parseDate($dateTime)
-{
-    $englishWeekdays= array('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
-    $greekWeekdays = array('Δευτέρα', 'Τρίτη', 'Τετάρτη', 'Πέμπτη', 'Παρασκευή', 'Σάββατο', 'Κυριακή');    
+function parseDate($dateTime) {
+    $englishWeekdays = array('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
+    $greekWeekdays = array('Δευτέρα', 'Τρίτη', 'Τετάρτη', 'Πέμπτη', 'Παρασκευή', 'Σάββατο', 'Κυριακή');
 
-    $englishMonths = array('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec');
-    $greekMonths = array('Ιαν','Φεβ','Μαρ','Απρ','Μαϊ','Ιουν','Ιουλ','Αυγ','Σεπ','Οκτ','Νοε','Δεκ');
+    $englishMonths = array('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec');
+    $greekMonths = array('Ιαν', 'Φεβ', 'Μαρ', 'Απρ', 'Μαϊ', 'Ιουν', 'Ιουλ', 'Αυγ', 'Σεπ', 'Οκτ', 'Νοε', 'Δεκ');
 
     $weekday = $dateTime->format('l');
     $key = array_search($weekday, $englishWeekdays);
@@ -144,378 +212,275 @@ function parseDate($dateTime)
     $month = $greekMonths[$key];
 
     $year = $dateTime->format('Y');
-    $date = $weekday.', '.$day.' '.$month.' '.$year;
+    $date = $weekday . ', ' . $day . ' ' . $month . ' ' . $year;
     return $date;
 }
 
-function parseTime($dateTime){return $dateTime->format('H:i');}
+function parseTime($dateTime) {
+    return $dateTime->format('H:i');
+}
 
-function printEvent($event,$isAdmin)
-{   
-    $dateString = parseDateTime($event['start'],$event['end']);
-    
-    print "<tr><td>".$dateString."</td>
-    <td><p class='summary'>".$event['summary']."</p>";
+function printEvent($event, $isAdmin) {
+    $dateString = parseDateTime($event['start'], $event['end']);
 
-    print "<div id='details'>"; 
-    if(isset($event['description']))
-    {
-        print "<p><b>Περιγραφή</b></p><p>".$event['description']."</p>"; 
+    print "<tr><td>" . $dateString . "</td>
+    <td><p class='summary'>" . $event['summary'] . "</p>";
+
+    print "<div id='details'>";
+    if (isset($event['description'])) {
+	print "<p><b>Περιγραφή</b></p><p>" . $event['description'] . "</p>";
     }
-    if($isAdmin == true)
-    {
-        print "<p><a eid='".$event['id']."' onclick='deleteEvent(this)'>Διαγραφή του Γεγονότος</a></p>";
+    if ($isAdmin == true) {
+	print "<p><a eid='" . $event['id'] . "' onclick='deleteEvent(this)'>Διαγραφή του Γεγονότος</a></p>";
     }
     print "</div></td></tr>";
 }
 
-function parseDateTime($start,$end)
-{
-    if(isset($start['date']))
-    {
-        $startDate = date_create_from_format('Y-m-d',$start['date']);
-        $endDate = date_create_from_format('Y-m-d',$end['date']);
-        $startDate = parseDate($startDate);
-        $endDate = parseDate($endDate);
-        if($startDate == $endDate)
-            $date = $startDate;
-        else
-            $date = $startDate.' έως '.$endDate;
+function parseDateTime($start, $end) {
+    if (isset($start['date'])) {
+	$startDate = date_create_from_format('Y-m-d', $start['date']);
+	$endDate = date_create_from_format('Y-m-d', $end['date']);
+	$startDate = parseDate($startDate);
+	$endDate = parseDate($endDate);
+	if ($startDate == $endDate)
+	    $date = $startDate;
+	else
+	    $date = $startDate . ' έως ' . $endDate;
     }
-    else
-    {
-         $startDate = date_create_from_format('Y-m-d\TG:i:sP',$start['dateTime']);
-         $endDate = date_create_from_format('Y-m-d\TG:i:sP',$end['dateTime']);
-         $startTime = parseTime($startDate);
-         $endTime = parseTime($endDate);
-         $startDate = parseDate($startDate);
-         $endDate = parseDate($endDate);
-         $date = $startDate.' στις '.$startTime;
-         if($startDate == $endDate)
-         {
-            $date.=' έως '.$endTime;
-        }
-         else
-            $date.=' έως '.$endDate.' στις '.$endTime;
+    else {
+	$startDate = date_create_from_format('Y-m-d\TG:i:sP', $start['dateTime']);
+	$endDate = date_create_from_format('Y-m-d\TG:i:sP', $end['dateTime']);
+	$startTime = parseTime($startDate);
+	$endTime = parseTime($endDate);
+	$startDate = parseDate($startDate);
+	$endDate = parseDate($endDate);
+	$date = $startDate . ' στις ' . $startTime;
+	if ($startDate == $endDate) {
+	    $date.=' έως ' . $endTime;
+	}
+	else
+	    $date.=' έως ' . $endDate . ' στις ' . $endTime;
     }
     return $date;
 }
 
-function deleteCalendarEvent($eventID)
-{
-    //$calendarID = 'crkkh6hgfvhi2caqagqcea5ef8@group.calendar.google.com';
-    $calendarID = 'nikos_l0st@live.com';
+function deleteCalendarEvent($eventID) {
+    $calendarID = variable_get('calendar_id');
     $calendarService = initGoogleClient();
-    $calendarService->events->delete($calendarID,$eventID);
+    $calendarService->events->delete($calendarID, $eventID);
 }
 
-function displayNewEventForm()
-{?>
-    <div id='formheader'>
-        <h3 id='newEventTitle'>Δημιουργία νέου γεγονότος</h3>
-    </div>
-    <div id='eventForm'>
-        <form name='newEvent' action='calendar' method='post'> 
-            <table id = 'formTable'>
-                <tr><td>Τίτλος</td><td><input type='text' size='25' name='summary' required/></td></tr>
-                <tr><td>Ημερομηνία Έναρξης</td><td><input type='text' size ='7' class='datepicker' id='startDate' name ='startDate' required/></td></tr>
-                <tr><td>Ώρα Έναρξης</td><td><input type='time' name='startTime' class='time' required/></td></tr>
-                <tr><td>Ημερομηνία Λήξης</td><td><input type='text' size='7' class='datepicker' id ='endDate' name='endDate' required/></td></tr>
-                <tr><td>Ώρα Λήξης</td><td><input type='time' name='endTime' class='time' required/></td></tr>
-                <tr><td>Ολοήμερο</td><td><input type='checkbox' id='fullDay' name='fullDay'/></td></tr>
-                <tr><td>Επανάληψη</td><td><input type='checkbox' id='recurrence' name='recurrence'/></td></tr>
-                <tr><td>Τοποθεσία</td><td><input type='text' size='25' name='location'/></td></tr>
-                <tr><td>Περιγραφή</td><td><textarea name='description' rows='4' form='eventForm'></textarea></td></tr>
-                <tr><td>Αποστολή Προσκλήσεων</td><td><input type='checkbox' id='invite' name='invite'></td></tr>
-                <tr><td><input type='submit' value='Αποθήκευση Γεγονότος' name='createEvent'/></td><td></td></tr>
-            </table>
-            <div id="recurrenceForm">
-                <h4>Eπανάληψη</h4>
-                <table>
-                    <tr><td>Επαναλήψεις:</td><td><select id ='frequencySelector' name='frequency'>
-                                                <option value='DAILY'>Καθημερινά</option>
-                                                <option value='WEEKLY' selected>Εβδομαδιαία</option>
-                                                <option value='MONTHLY'>Μηνιαία</option>
-                                                </select></td></tr>
-                    <tr id='repeat'><td>Επανάληψη κάθε:</td><td><input name="repeat" type="number" min="1" max="29" step="1"  value="6"> εβδομάδες</td></tr>
+function displayNewEventForm() {
+    include "createNewEvent.html";
+}
 
-                    <tr id='days'><td>Επανάληψη την:</td><td><input name='days[]' type='checkbox' value='MO'>Δ
-                                                    <input name='days[]' type='checkbox' value='TU'>Τ
-                                                    <input name='days[]' type='checkbox' value='WE'>Τ
-                                                    <input name='days[]' type='checkbox' value='TH'>Π
-                                                    <input name='days[]' type='checkbox' value='FR'>Π
-                                                    <input name='days[]' type='checkbox' value='SA'>Σ
-                                                    <input name='days[]' type='checkbox' value='SU'>Κ
-                                                    </td></tr>
-                    <tr><td>Λήγει:</td><td><input type='radio' name='expiration' value='never' checked/>Ποτέ<br>
-                                            <input type='radio' name='expiration' value='after'/>Μετά από <input type="number" name="occurrences" min="1" disabled/> εμφανίσεις<br>
-                                            <input type='radio' name='expiration' value='until'/>Στις <input type='text' size ='7' class='datepicker' name ='recurrenceEnd' disabled/></td></tr>
-                </table>
-            </div>
-        </form>
-    </div>
-    <div id='formheader'>
-        <h3 id='subscribeTitle'>Εγγραφή/Διαγραφή Για Προσκλήσεις</h3>
-    </div>
-    <div id='subscribeForm'>
-        <form name='newSubscriber' method='post' action='calendar'>
-            <table id='formTable'>
-                <tr><td>Εισάγετε την διεύθυνση e-mail σας</td><td><input type='email' name='e-mail' size='25' name='summary' required/><input type='submit' value='Εγγραφή' name='subscribeButton'/><input type='submit' value='Διαγραφή' name='subscribeButton'/></td></tr>
-            </table>
-        </form>
-    </div>
+function getWeekdayBYDAY($date) {
 
-<?php } ?>
-
-<?php
-
-
-function getWeekdayBYDAY($date)
-{
-
-    $englishWeekdays= array('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
-    $codedWeekdays = array('MO','TU','WE','TH','FR','SA','SU');
+    $englishWeekdays = array('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
+    $codedWeekdays = array('MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU');
 
     $date = $date->format('l');
     $key = array_search($date, $englishWeekdays);
     return $codedWeekdays[$key];
 }
 
-function insertCalendarEvent($data)
-{
+function insertCalendarEvent($data) {
 
-    $calendarID = 'nikos_l0st@live.com';
+    $calendarID = variable_get('calendar_id');
     $calendarService = initGoogleClient();
     $event = new Google_Event();
     $event->setSummary($data['summary']);
 
-    if(isset($data['location']))
-        $event->setLocation($data['location']);
-    if(isset($data['description']))
-        $event->setDescription($data['description']);
-
-        
-        $startDate = new Google_EventDateTime();
-        $endDate = new Google_EventDateTime();
-        if(isset($data['fullDay']))
-        {
-            $startDate->setDate($data['startDate']);
-            $endDate ->setDate($data['endDate']);
-        }
-        else
-        {
-            $startDate->setDateTime($data['startDate']."T".$data['startTime'].":00");
-            $endDate->setDateTime($data['endDate']."T".$data['endTime'].":00");
-        }
-
-        $startDate->setTimeZone("Europe/Athens");
-        $endDate->setTimeZone("Europe/Athens");
-        $event->setStart($startDate);
-        $event->setEnd($endDate);
-        
-
-    if(isset($data['recurrence']))
-    {
-        $recurrenceDay = getWeekdayBYDAY(date_create_from_format('Y-m-d',$data['startDate']));
-        $recurrenceRule = "RRULE:FREQ=".$data['frequency'].";";
-        
-        if($data['expiration'] == "after")
-        {
-            $recurrenceRule.="COUNT=".$data['occurrences'].";";
-        }
-        else if($data['expiration'] == 'until')
-        {
-            $recurrenceEnd = date_create_from_format('Y-m-d',$data['recurrenceEnd']);
-            $recurrenceRule.='UNTIL='.$recurrenceEnd->format('Ymd').';';
-        }
+    if (isset($data['location']))
+	$event->setLocation($data['location']);
+    if (isset($data['description']))
+	$event->setDescription($data['description']);
 
 
-        if ($data['frequency'] == 'DAILY')
-            $recurrenceRule.="INTERVAL=".$data['repeat'];
-        else if($data['frequency'] == 'WEEKLY')
-        {
-            $recurrenceRule.="INTERVAL=".$data['repeat'].';';
-            if(isset($data['days']))
-            {   
-                $days = implode(",", $data['days']);
-                if(in_array($recurrenceDay, $data['days']))
-                    $recurrenceRule.="BYDAY=".$days;
-                else
-                    $recurrenceRule.="BYDAY=".$days.','.$recurrenceDay;
-            }
-            else
-                $recurrenceRule.="BYDAY=".$recurrenceDay;
-        }   
-        else
-        {
-            $recurrenceRule.="INTERVAL=".$data['repeat'].';';
-            if($data['days'] == 'weekday')
-                $recurrenceRule.='BYDAY=1'.$recurrenceDay;
-            else if($data['days'] == 'monthday')
-            {
-                $day = date_create_from_format('Y-m-d',$data['startDate'])->format('d');
-                $recurrenceRule.="BYMONTHDAY=".$day;
-            }
-        }
-
-
-        $event->setRecurrence(array($recurrenceRule));
+    $startDate = new Google_EventDateTime();
+    $endDate = new Google_EventDateTime();
+    if (isset($data['fullDay'])) {
+	$startDate->setDate($data['startDate']);
+	$endDate->setDate($data['endDate']);
+    } else {
+	$startDate->setDateTime($data['startDate'] . "T" . $data['startTime'] . ":00");
+	$endDate->setDateTime($data['endDate'] . "T" . $data['endTime'] . ":00");
     }
-   
-    
 
-    if(isset($data['invite']))
-    {
-        $xml = simplexml_load_file("sites/all/modules/calendar/contacts.xml");
+    $startDate->setTimeZone("Europe/Athens");
+    $endDate->setTimeZone("Europe/Athens");
+    $event->setStart($startDate);
+    $event->setEnd($endDate);
 
-        $i = 0;
 
-        if($xml->count() > 0)
-        {
-            foreach ($xml->children() as $subscriber) 
-            {
-                $attendees[$i] = new Google_EventAttendee();
-                $attendees[$i]->setEmail($subscriber);
-            }
+    if (isset($data['recurrence'])) {
+	$recurrenceDay = getWeekdayBYDAY(date_create_from_format('Y-m-d', $data['startDate']));
+	$recurrenceRule = "RRULE:FREQ=" . $data['frequency'] . ";";
 
-            $event->attendees = $attendees;
-        }
+	if ($data['expiration'] == "after") {
+	    $recurrenceRule.="COUNT=" . $data['occurrences'] . ";";
+	} else if ($data['expiration'] == 'until') {
+	    $recurrenceEnd = date_create_from_format('Y-m-d', $data['recurrenceEnd']);
+	    $recurrenceRule.='UNTIL=' . $recurrenceEnd->format('Ymd') . ';';
+	}
+
+
+	if ($data['frequency'] == 'DAILY')
+	    $recurrenceRule.="INTERVAL=" . $data['repeat'];
+	else if ($data['frequency'] == 'WEEKLY') {
+	    $recurrenceRule.="INTERVAL=" . $data['repeat'] . ';';
+	    if (isset($data['days'])) {
+		$days = implode(",", $data['days']);
+		if (in_array($recurrenceDay, $data['days']))
+		    $recurrenceRule.="BYDAY=" . $days;
+		else
+		    $recurrenceRule.="BYDAY=" . $days . ',' . $recurrenceDay;
+	    }
+	    else
+		$recurrenceRule.="BYDAY=" . $recurrenceDay;
+	}
+	else {
+	    $recurrenceRule.="INTERVAL=" . $data['repeat'] . ';';
+	    if ($data['days'] == 'weekday')
+		$recurrenceRule.='BYDAY=1' . $recurrenceDay;
+	    else if ($data['days'] == 'monthday') {
+		$day = date_create_from_format('Y-m-d', $data['startDate'])->format('d');
+		$recurrenceRule.="BYMONTHDAY=" . $day;
+	    }
+	}
+
+
+	$event->setRecurrence(array($recurrenceRule));
     }
-    
+
+    if (isset($data['invite'])) {
+	$xml = simplexml_load_file("sites/all/modules/calendar/contacts.xml");
+
+	$i = 0;
+
+	if ($xml->count() > 0) {
+	    foreach ($xml->children() as $subscriber) {
+		$attendees[$i] = new Google_EventAttendee();
+		$attendees[$i]->setEmail($subscriber);
+	    }
+
+	    $event->attendees = $attendees;
+	}
+    }
+
     $event->setAttendeesOmitted(false);
     $event->setAnyoneCanAddSelf(true);
     $event->setGuestsCanInviteOthers(true);
     $event->setGuestsCanSeeOtherGuests(true);
-    
+
     $optional = array();
 
     $eventService = $calendarService->events;
-    $eventService->insert($calendarID,$event,$optional);
+    $eventService->insert($calendarID, $event, $optional);
 }
 
-function insertNewSubscriber($email)
-{
-    $subscriptionFile=("sites/all/modules/calendar/contacts.xml");
-    $xml=simplexml_load_file($subscriptionFile);
-    $mailExists = false;
-
-    foreach ($xml->children() as $subscriber)
-    {
-        if($subscriber == $email)
-        {
-            $mailExists = true;
-            break;
-        }
-    }
-
-    if($mailExists == false)
-    {
-        $xml->addChild("subscriber",$email);
-        $xml->asXML($subscriptionFile);
-    }
-    
-}
-
-
-function  deleteSubscriber($email)
-{
+function insertNewSubscriber($email) {
     $subscriptionFile = ("sites/all/modules/calendar/contacts.xml");
     $xml = simplexml_load_file($subscriptionFile);
-    
-    foreach ($xml->children() as $subscriber) 
-    {
-        if($subscriber == $email)
-        {
-            $dom=dom_import_simplexml($subscriber);
-            $dom->parentNode->removeChild($dom);
-            break;
-        }
-        
+    $mailExists = false;
+
+    foreach ($xml->children() as $subscriber) {
+	if ($subscriber == $email) {
+	    $mailExists = true;
+	    break;
+	}
     }
-    $xml->asXML($subscriptionFile); 
+
+    if ($mailExists == false) {
+	$xml->addChild("subscriber", $email);
+	$xml->asXML($subscriptionFile);
+    }
+}
+
+function deleteSubscriber($email) {
+    $subscriptionFile = ("sites/all/modules/calendar/contacts.xml");
+    $xml = simplexml_load_file($subscriptionFile);
+
+    foreach ($xml->children() as $subscriber) {
+	if ($subscriber == $email) {
+	    $dom = dom_import_simplexml($subscriber);
+	    $dom->parentNode->removeChild($dom);
+	    break;
+	}
+    }
+    $xml->asXML($subscriptionFile);
     var_dump($xml);
 }
 
-function uberdust_event_handler($startDate, $endDate)
-{
+function uberdust_event_handler($startDate, $endDate) {
     //$timezone = date_default_timezone_get();
     //print "The current server timezone is: " . $timezone;
     date_default_timezone_set('Europe/Athens');
 
     $current_datetime = new DateTime();
-    print "Current time: ".$current_datetime->format('Y-m-d\TG:i:sP');
+    print "Current time: " . $current_datetime->format('Y-m-d\TG:i:sP');
 
-    if($current_datetime < $startDate) 
-    {
-        $diff = $startDate->diff($current_datetime);
-        $time_left['years'] = $diff->format("%y");
-        $time_left['months'] = $diff->format("%m");
-        $time_left['days'] = $diff->format("%d");
-        $time_left['hours'] = $diff->format("%h");
-        $time_left['minutes'] = $diff->format("%i");
-        $time_left['seconds'] = $diff->format("%s");
+    if ($current_datetime < $startDate) {
+	$diff = $startDate->diff($current_datetime);
+	$time_left['years'] = $diff->format("%y");
+	$time_left['months'] = $diff->format("%m");
+	$time_left['days'] = $diff->format("%d");
+	$time_left['hours'] = $diff->format("%h");
+	$time_left['minutes'] = $diff->format("%i");
+	$time_left['seconds'] = $diff->format("%s");
 
-        print " Time left for the Event to start: ".$time_left['years']." years,".
-            $time_left['months']." months,".
-            $time_left['days']." days,".
-            $time_left['hours']." hours,".
-            $time_left['minutes']." minutes,".
-            $time_left['seconds']." seconds";
+	print " Time left for the Event to start: " . $time_left['years'] . " years," .
+		$time_left['months'] . " months," .
+		$time_left['days'] . " days," .
+		$time_left['hours'] . " hours," .
+		$time_left['minutes'] . " minutes," .
+		$time_left['seconds'] . " seconds";
 
-        if ( ( $time_left['years'] == 0) && ( $time_left['months'] == 0) && ( $time_left['days'] == 0) )
-        {
-            if ( $time_left['hours'] <= 1 )
-            {
-                //print "start the aircondition system";
-                //uberdust_activate_nodes(aircondition, zone, 1);
-                if ($time_left['minutes'] <= 10)
-                {
-                   //print "switch on the lights";
-                    //uberdust_activate_nodes(light, zone, 1);
-                }
-            }
-        }
-    }
-    else if($current_datetime >= $endDate)
-    {
-        $diff = $endDate->diff($current_datetime);
-        $time_left['years'] = $diff->format("%y");
-        $time_left['months'] = $diff->format("%m");
-        $time_left['days'] = $diff->format("%d");
-        $time_left['hours'] = $diff->format("%h");
-        $time_left['minutes'] = $diff->format("%i");
-        $time_left['seconds'] = $diff->format("%s");
+	if (( $time_left['years'] == 0) && ( $time_left['months'] == 0) && ( $time_left['days'] == 0)) {
+	    if ($time_left['hours'] <= 1) {
+		//print "start the aircondition system";
+		//uberdust_activate_nodes(aircondition, zone, 1);
+		if ($time_left['minutes'] <= 10) {
+		    //print "switch on the lights";
+		    //uberdust_activate_nodes(light, zone, 1);
+		}
+	    }
+	}
+    } else if ($current_datetime >= $endDate) {
+	$diff = $endDate->diff($current_datetime);
+	$time_left['years'] = $diff->format("%y");
+	$time_left['months'] = $diff->format("%m");
+	$time_left['days'] = $diff->format("%d");
+	$time_left['hours'] = $diff->format("%h");
+	$time_left['minutes'] = $diff->format("%i");
+	$time_left['seconds'] = $diff->format("%s");
 
-        print " Event has reached end ".$time_left['years']." years,".
-            $time_left['months']." months,".
-            $time_left['days']." days,".
-            $time_left['hours']." hours,".
-            $time_left['minutes']." minutes,".
-            $time_left['seconds']." seconds ago";
+	print " Event has reached end " . $time_left['years'] . " years," .
+		$time_left['months'] . " months," .
+		$time_left['days'] . " days," .
+		$time_left['hours'] . " hours," .
+		$time_left['minutes'] . " minutes," .
+		$time_left['seconds'] . " seconds ago";
 
-        if ( ( $time_left['years'] == 0) && ( $time_left['months'] == 0) && ( $time_left['days'] == 0) && ( $time_left['hours'] == 0) )
-        {
-                if ($time_left['minutes'] >= 5)
-                {
-                    //print "stop the aircondition system";
-                    //uberdust_activate_nodes(aircondition, zone, 0);
-                    //print "switch off the lights";
-                    //uberdust_activate_nodes(light, zone, 0);
-                }
-        }
+	if (( $time_left['years'] == 0) && ( $time_left['months'] == 0) && ( $time_left['days'] == 0) && ( $time_left['hours'] == 0)) {
+	    if ($time_left['minutes'] >= 5) {
+		//print "stop the aircondition system";
+		//uberdust_activate_nodes(aircondition, zone, 0);
+		//print "switch off the lights";
+		//uberdust_activate_nodes(light, zone, 0);
+	    }
+	}
     }
 }
 
-function uberdust_activate_nodes($node, $zone, $status)
-{
-    switch(node)
-    {
-    case aircondition:
-       // $.post( "http://uberdust.cti.gr/rest/testbed/1/node/urn:wisebed:ctitestbed:150.140.5.67/capability/urn:wisebed:node:capability:" +zone +"r/0/",status);
-        // http://uberdust.cti.gr/rest/testbed/5/node/urn:pspace:0x0ba/capability/urn:node:capability:light_switch/json/limit/10  <== auto gia p-space
-    case lights:
-        //$.post( "http://uberdust.cti.gr/rest/testbed/1/node/urn:wisebed:ctitestbed:150.140.5.67/capability/urn:wisebed:node:capability:" +zone +"r/0/",status);
-    default:
+function uberdust_activate_nodes($node, $zone, $status) {
+    switch (node) {
+	case aircondition:
+	// $.post( "http://uberdust.cti.gr/rest/testbed/1/node/urn:wisebed:ctitestbed:150.140.5.67/capability/urn:wisebed:node:capability:" +zone +"r/0/",status);
+	// http://uberdust.cti.gr/rest/testbed/5/node/urn:pspace:0x0ba/capability/urn:node:capability:light_switch/json/limit/10  <== auto gia p-space
+	case lights:
+	//$.post( "http://uberdust.cti.gr/rest/testbed/1/node/urn:wisebed:ctitestbed:150.140.5.67/capability/urn:wisebed:node:capability:" +zone +"r/0/",status);
+	default:
     }
 }
-?>
+

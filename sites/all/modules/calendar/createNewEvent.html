@@ -1,0 +1,54 @@
+
+<div id='formheader'>
+    <h3 id='newEventTitle'>Δημιουργία νέου γεγονότος</h3>
+</div>
+<div id='eventForm'>
+    <form name='newEvent' action='calendar' method='post'>
+	<table id = 'formTable'>
+	    <tr><td>Τίτλος</td><td><input type='text' size='25' name='summary' required/></td></tr>
+	    <tr><td>Ημερομηνία Έναρξης</td><td><input type='text' size ='7' class='datepicker' id='startDate' name ='startDate' required/></td></tr>
+	    <tr><td>Ώρα Έναρξης</td><td><input type='time' name='startTime' class='time' required/></td></tr>
+	    <tr><td>Ημερομηνία Λήξης</td><td><input type='text' size='7' class='datepicker' id ='endDate' name='endDate' required/></td></tr>
+	    <tr><td>Ώρα Λήξης</td><td><input type='time' name='endTime' class='time' required/></td></tr>
+	    <tr><td>Ολοήμερο</td><td><input type='checkbox' id='fullDay' name='fullDay'/></td></tr>
+	    <tr><td>Επανάληψη</td><td><input type='checkbox' id='recurrence' name='recurrence'/></td></tr>
+	    <tr><td>Τοποθεσία</td><td><input type='text' size='25' name='location'/></td></tr>
+	    <tr><td>Περιγραφή</td><td><textarea name='description' rows='4' form='eventForm'></textarea></td></tr>
+	    <tr><td>Αποστολή Προσκλήσεων</td><td><input type='checkbox' id='invite' name='invite'></td></tr>
+	    <tr><td><input type='submit' value='Αποθήκευση Γεγονότος' name='createEvent'/></td><td></td></tr>
+	</table>
+	<div id="recurrenceForm">
+	    <h4>Eπανάληψη</h4>
+	    <table>
+		<tr><td>Επαναλήψεις:</td><td><select id ='frequencySelector' name='frequency'>
+			    <option value='DAILY'>Καθημερινά</option>
+			    <option value='WEEKLY' selected>Εβδομαδιαία</option>
+			    <option value='MONTHLY'>Μηνιαία</option>
+			</select></td></tr>
+		<tr id='repeat'><td>Επανάληψη κάθε:</td><td><input name="repeat" type="number" min="1" max="29" step="1"  value="6"> εβδομάδες</td></tr>
+
+		<tr id='days'><td>Επανάληψη την:</td><td><input name='days[]' type='checkbox' value='MO'>Δ
+			<input name='days[]' type='checkbox' value='TU'>Τ
+			<input name='days[]' type='checkbox' value='WE'>Τ
+			<input name='days[]' type='checkbox' value='TH'>Π
+			<input name='days[]' type='checkbox' value='FR'>Π
+			<input name='days[]' type='checkbox' value='SA'>Σ
+			<input name='days[]' type='checkbox' value='SU'>Κ
+		    </td></tr>
+		<tr><td>Λήγει:</td><td><input type='radio' name='expiration' value='never' checked/>Ποτέ<br>
+			<input type='radio' name='expiration' value='after'/>Μετά από <input type="number" name="occurrences" min="1" disabled/> εμφανίσεις<br>
+			<input type='radio' name='expiration' value='until'/>Στις <input type='text' size ='7' class='datepicker' name ='recurrenceEnd' disabled/></td></tr>
+	    </table>
+	</div>
+    </form>
+</div>
+<div id='formheader'>
+    <h3 id='subscribeTitle'>Εγγραφή/Διαγραφή Για Προσκλήσεις</h3>
+</div>
+<div id='subscribeForm'>
+    <form name='newSubscriber' method='post' action='calendar'>
+	<table id='formTable'>
+	    <tr><td>Εισάγετε την διεύθυνση e-mail σας</td><td><input type='email' name='e-mail' size='25' name='summary' required/><input type='submit' value='Εγγραφή' name='subscribeButton'/><input type='submit' value='Διαγραφή' name='subscribeButton'/></td></tr>
+	</table>
+    </form>
+</div>

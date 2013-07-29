@@ -1,6 +1,6 @@
 name = calendarVis
-description = Google Calendar Visualization for P-space
+description = Google Calendar Events Organizer for P-space
 core = 7.x
-
 dependencies[] = libraries
 
+configure = admin/config/content/calendar
