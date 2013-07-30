@@ -84,8 +84,12 @@ function calendarEventHandler() {
     //libraries_load("google-api-php-client");
     require_once 'sites/all/libraries/google-api-php-client/src/Google_Client.php';
     require_once 'sites/all/libraries/google-api-php-client/src/contrib/Google_CalendarService.php';
+    $redirect_uri = variable_get('calendar_redirect_uri');
+    $client_id = variable_get('calendar_client_id');
+    $client_secret = variable_get('calendar_client_secret');
+    $api_key = variable_get('calendar_api_key');
 
-    if (empty(variable_get('calendar_redirect_uri')) || empty(variable_get('calendar_client_id')) || empty(variable_get('calendar_client_secret')) || empty(variable_get('calendar_api_key'))) {
+    if (!isset($redirect_uri) || !isset($client_id) || !isset($client_secret) || !isset($api_key)) {
 	header('Location: /admin/config/content/calendar');
     } else if (empty($_GET['action']) && empty($_POST))
 	displayCalendarEvents();
