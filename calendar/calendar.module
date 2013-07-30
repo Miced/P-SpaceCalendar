@@ -84,7 +84,10 @@ function calendarEventHandler() {
     //libraries_load("google-api-php-client");
     require_once 'sites/all/libraries/google-api-php-client/src/Google_Client.php';
     require_once 'sites/all/libraries/google-api-php-client/src/contrib/Google_CalendarService.php';
-    if (empty($_GET['action']) && empty($_POST))
+
+    if (empty(variable_get('calendar_redirect_uri')) || empty(variable_get('calendar_client_id')) || empty(variable_get('calendar_client_secret')) || empty(variable_get('calendar_api_key'))) {
+	header('Location: /admin/config/content/calendar');
+    } else if (empty($_GET['action']) && empty($_POST))
 	displayCalendarEvents();
     else if (!empty($_GET['action'])) {
 	if ($_GET['action'] == 'delete') {
@@ -354,7 +357,7 @@ function insertCalendarEvent($data) {
     }
 
     if (isset($data['invite'])) {
-	$xml = simplexml_load_file("sites/all/modules/calendar/contacts.xml");
+	$xml = simplexml_load_file("contacts.xml");
 
 	$i = 0;
 
@@ -380,7 +383,7 @@ function insertCalendarEvent($data) {
 }
 
 function insertNewSubscriber($email) {
-    $subscriptionFile = ("sites/all/modules/calendar/contacts.xml");
+    $subscriptionFile = ("contacts.xml");
     $xml = simplexml_load_file($subscriptionFile);
     $mailExists = false;
 
@@ -398,7 +401,7 @@ function insertNewSubscriber($email) {
 }
 
 function deleteSubscriber($email) {
-    $subscriptionFile = ("sites/all/modules/calendar/contacts.xml");
+    $subscriptionFile = ("contacts.xml");
     $xml = simplexml_load_file($subscriptionFile);
 
     foreach ($xml->children() as $subscriber) {
