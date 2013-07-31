@@ -9,7 +9,7 @@ $(document).ready(function() {
     });
     $(".summary").each(function() {
 	$(this).click(function() {
-	    $(this).next().slideToggle(300);
+	    $(this).children().children(".details").slideToggle(300);
 	});
     });
     $(".datepicker").each(function() {

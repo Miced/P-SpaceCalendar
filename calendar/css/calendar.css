@@ -1,16 +1,16 @@
-textarea{
-    resize:none;
+textarea {
+    resize: none;
 }
 
-.calendarContainer{
+.calendarContainer {
     margin: 0 auto;
     margin-top: 50px;
-    width:550px;
+    width: 550px;
     height: 350px;
     overflow-y: auto;
 }
 
-.calendarTable{
+.calendarTable {
     table-layout: fixed;
     border-collapse: collapse;
     width: 100%;
@@ -18,10 +18,9 @@ textarea{
 
 .details{
     display: none;
-    cursor: pointer;
 }
 
-.formheader{
+.formheader {
     text-align: center;
     margin: 0 auto;
     margin-top: 25px;
@@ -29,14 +28,19 @@ textarea{
     cursor: pointer;
 }
 
-#eventForm, #subscribeForm{
+#eventForm, #subscribeForm {
     margin: 0 auto;
     margin-top: 25px;
     width: 550px;
     display: none;
 }
 
-#recurrenceForm{
+#recurrenceForm {
     display: none;
     z-index: 1;
+}
+
+.summary:hover, .summary:active {
+    background: #B3B3B3;
+    cursor: pointer;
 }

@@ -230,8 +230,8 @@ function parseTime($dateTime) {
 function printEvent($event, $isAdmin) {
     $dateString = parseDateTime($event['start'], $event['end']);
 
-    print "<tr><td>" . $dateString . "</td>
-    <td><p class='summary'>" . $event['summary'] . "</p>";
+    print "<tr class='summary'><td>" . $dateString . "</td>
+    <td><p>" . $event['summary'] . "</p>";
 
     print "<div class='details'>";
     if (isset($event['description'])) {
@@ -394,17 +394,20 @@ function insertCalendarEvent($data) {
     }
 
     if (isset($data['invite'])) {
-	$xml = simplexml_load_file("contacts.xml");
+	$subscriptionFile = drupal_get_path('module', 'calendar') . "/contacts.xml";
+	if (file_exists($subscriptionFile) && $xml = simplexml_load_file($subscriptionFile)) {
 
-	$i = 0;
+	    $i = 0;
 
-	if ($xml->count() > 0) {
-	    foreach ($xml->children() as $subscriber) {
-		$attendees[$i] = new Google_EventAttendee();
-		$attendees[$i]->setEmail($subscriber);
+	    if ($xml->count() > 0) {
+		foreach ($xml->children() as $subscriber) {
+		    $attendees[$i] = new Google_EventAttendee();
+		    $attendees[$i]->setEmail((string) $subscriber);
+		    $i++;
+		}
+
+		$event->attendees = $attendees;
 	    }
-
-	    $event->attendees = $attendees;
 	}
     }
 
@@ -420,8 +423,16 @@ function insertCalendarEvent($data) {
 }
 
 function insertNewSubscriber($email) {
-    $subscriptionFile = ("contacts.xml");
-    $xml = simplexml_load_file($subscriptionFile);
+    $subscriptionFile = drupal_get_path('module', 'calendar') . "/contacts.xml";
+    if (!file_exists($subscriptionFile)) {
+	$xml = new DOMDocument();
+	$xml->appendChild($xml->createElement('list'));
+	$xml->save($subscriptionFile);
+    }
+    if (!($xml = simplexml_load_file($subscriptionFile))) {
+	echo 'error';
+    }
+
     $mailExists = false;
 
     foreach ($xml->children() as $subscriber) {
@@ -438,7 +449,10 @@ function insertNewSubscriber($email) {
 }
 
 function deleteSubscriber($email) {
-    $subscriptionFile = ("contacts.xml");
+    $subscriptionFile = drupal_get_path('module', 'calendar') . "/contacts.xml";
+    if (!file_exists($subscriptionFile)) {
+	return;
+    }
     $xml = simplexml_load_file($subscriptionFile);
 
     foreach ($xml->children() as $subscriber) {
