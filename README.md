@@ -12,10 +12,8 @@ Installation
 
 3) Uncompress Google API PHP Client under 'sites/all/libraries/'.
 
-4) Merge 'touch' folder with 'sites/all/themes/touch'.
+4) Enable 'CalendarVis' module from Drupal's modules menu. Make sure PHP Filter is enabled.
 
-5) Enable 'CalendarVis' module from Drupal's modules menu. Make sure PHP Filter is enabled.
+5) Visit the module's configuration page and set the Google Calendar's parameters.
 
-6) Visit the module's configuration page and set the Google Calendar's parameters.
-
-7) Go to the page you want the calendar menus to appear, and call 'calendarEventHandler()' function.
+6) Go to the page you want the calendar menus to appear, and call 'calendarEventHandler()' function.
