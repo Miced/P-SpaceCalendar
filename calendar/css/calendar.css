@@ -1,0 +1,42 @@
+textarea{
+    resize:none;
+}
+
+.calendarContainer{
+    margin: 0 auto;
+    margin-top: 50px;
+    width:550px;
+    height: 350px;
+    overflow-y: auto;
+}
+
+.calendarTable{
+    table-layout: fixed;
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.details{
+    display: none;
+    cursor: pointer;
+}
+
+.formheader{
+    text-align: center;
+    margin: 0 auto;
+    margin-top: 25px;
+    width: 550px;
+    cursor: pointer;
+}
+
+#eventForm, #subscribeForm{
+    margin: 0 auto;
+    margin-top: 25px;
+    width: 550px;
+    display: none;
+}
+
+#recurrenceForm{
+    display: none;
+    z-index: 1;
+}

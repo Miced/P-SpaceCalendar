@@ -117,12 +117,12 @@ function displayCalendarEvents() {
     $events = getCalendarEvents();
     $eventListSize = sizeof($events);
 
-    print "<div id='calendarContainer'>";
+    print "<div class='calendarContainer'>";
 
     if ($eventListSize == 0) {
 	print "<h3>Δεν υπάρχουν καταχωρημένα γεγονότα στο ημερολόγιο!";
     } else {
-	print "<table id ='calendarTable'>
+	print "<table class='calendarTable'>
         <thead><th>Ημερομηνία</th><th>Event</th></thead>";
 	for ($i = 0; $i < $eventListSize; $i++) {
 	    $event = $events[$i];
@@ -233,9 +233,37 @@ function printEvent($event, $isAdmin) {
     print "<tr><td>" . $dateString . "</td>
     <td><p class='summary'>" . $event['summary'] . "</p>";
 
-    print "<div id='details'>";
+    print "<div class='details'>";
     if (isset($event['description'])) {
 	print "<p><b>Περιγραφή</b></p><p>" . $event['description'] . "</p>";
+    }
+    if (isset($event['attendees'])) {
+	$attendees = $event['attendees'];
+	$totalGuests = sizeof($attendees);
+	$guestsAccepted = 0;
+	$guestsPending = 0;
+	$guestsTentative = 0;
+	$guestsDeclined = 0;
+
+	for ($i = 0; $i < $totalGuests; $i++) {
+	    $status = $attendees[$i]['responseStatus'];
+	    switch ($status) {
+		case 'needsAction':
+		    $guestsPending++;
+		    break;
+		case 'declined':
+		    $guestsDeclined++;
+		    break;
+		case 'tentative':
+		    $guestsTentative++;
+		    break;
+		case 'accepted':
+		    $guestsAccepted++;
+		    break;
+	    }
+	}
+
+	print "<h5>Στατιστικά</h5><p>Προσκεκλημένοι: " . $totalGuests . " Ναι: " . $guestsAccepted . " Οχι: " . $guestsDeclined . " Ίσως: " . $guestsTentative . " Καμία Απάντηση: " . $guestsPending . "</p>";
     }
     if ($isAdmin == true) {
 	print "<p><a eid='" . $event['id'] . "' onclick='deleteEvent(this)'>Διαγραφή του Γεγονότος</a></p>";
@@ -278,6 +306,11 @@ function deleteCalendarEvent($eventID) {
 }
 
 function displayNewEventForm() {
+    drupal_add_css(drupal_get_path('module', 'calendar') . '/css/calendar.css', NULL);
+    drupal_add_js(drupal_get_path('module', 'calendar') . '/js/jquery-2.0.1.min.js');
+    drupal_add_js(drupal_get_path('module', 'calendar') . '/js/jquery-ui.js');
+    drupal_add_js(drupal_get_path('module', 'calendar') . '/js/scrolltopcontrol.js');
+    drupal_add_js(drupal_get_path('module', 'calendar') . '/js/calendar.js');
     include "createNewEvent.html";
 }
 
