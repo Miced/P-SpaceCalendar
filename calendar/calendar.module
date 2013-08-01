@@ -50,30 +50,21 @@ function calendar_form($form, &$form_state) {
 	'#required' => TRUE,
     );
 
-    $form['calendar_client_secret'] = array(
+    $form['calendar_service_account'] = array(
 	'#type' => 'textfield',
-	'#title' => t('Client Secret'),
-	'#default_value' => variable_get('calendar_client_secret'),
+	'#title' => t('Service account name'),
+	'#default_value' => variable_get('calendar_service_account'),
 	'#size' => 60,
-	'#description' => t('The Client Secret of the service account.'),
+	'#description' => t('The service account name (or e-mail).'),
 	'#required' => TRUE,
     );
 
-    $form['calendar_api_key'] = array(
+    $form['calendar_key_path'] = array(
 	'#type' => 'textfield',
-	'#title' => t('API key'),
-	'#default_value' => variable_get('calendar_api_key'),
+	'#title' => t('Key path'),
+	'#default_value' => variable_get('calendar_key_path'),
 	'#size' => 60,
-	'#description' => t('The API access key (for server apps).'),
-	'#required' => TRUE,
-    );
-
-    $form['calendar_redirect_uri'] = array(
-	'#type' => 'textfield',
-	'#title' => t('Redirect_URI'),
-	'#default_value' => variable_get('calendar_redirect_uri'),
-	'#size' => 60,
-	'#description' => t('The URI of the page to redirect to after authorization.'),
+	'#description' => t('The private key\'s path (from drupal root)'),
 	'#required' => TRUE,
     );
 
@@ -81,16 +72,15 @@ function calendar_form($form, &$form_state) {
 }
 
 function calendarEventHandler() {
-    //libraries_load("google-api-php-client");
     require_once 'sites/all/libraries/google-api-php-client/src/Google_Client.php';
     require_once 'sites/all/libraries/google-api-php-client/src/contrib/Google_CalendarService.php';
-    $redirect_uri = variable_get('calendar_redirect_uri');
     $client_id = variable_get('calendar_client_id');
-    $client_secret = variable_get('calendar_client_secret');
-    $api_key = variable_get('calendar_api_key');
+    $calendar_id = variable_get('calendar_id');
+    $service_account_name = variable_get('calendar_service_account');
+    $key_path = variable_get('calendar_key_path');
 
-    if (!isset($redirect_uri) || !isset($client_id) || !isset($client_secret) || !isset($api_key)) {
-	header('Location: /admin/config/content/calendar');
+    if (!isset($client_id) || !isset($calendar_id) || !isset($service_account_name) || !isset($key_path)) {
+	header('Location: ' . base_path() . '/admin/config/content/calendar');
     } else if (empty($_GET['action']) && empty($_POST))
 	displayCalendarEvents();
     else if (!empty($_GET['action'])) {
@@ -116,6 +106,11 @@ function displayCalendarEvents() {
 
     $events = getCalendarEvents();
     $eventListSize = sizeof($events);
+    drupal_add_css(drupal_get_path('module', 'calendar') . '/css/calendar.css', NULL);
+    drupal_add_js(drupal_get_path('module', 'calendar') . '/js/jquery-2.0.1.min.js');
+    drupal_add_js(drupal_get_path('module', 'calendar') . '/js/jquery-ui.js');
+    drupal_add_js(drupal_get_path('module', 'calendar') . '/js/scrolltopcontrol.js');
+    drupal_add_js(drupal_get_path('module', 'calendar') . '/js/calendar.js');
 
     print "<div class='calendarContainer'>";
 
@@ -132,8 +127,10 @@ function displayCalendarEvents() {
     }
     print "</div>";
     if ($role == true) {
-	displayNewEventForm();
+	include "createNewEvent.html";
     }
+
+    include "subscribeForm.html";
 }
 
 function getCalendarEvents() {
@@ -162,42 +159,40 @@ function getCalendarEvents() {
 }
 
 function initGoogleClient() {
+
     $clientID = variable_get('calendar_client_id');
-    $clientSecret = variable_get('calendar_client_secret');
-    $developerKey = variable_get('calendar_api_key');
-    $redirectUri = variable_get('calendar_redirect_uri');
+    $serviceAccountName = variable_get('calendar_service_account');
+
+    $keyFile = variable_get('calendar_key_path');
 
     $client = new Google_Client();
-    $client->setApplicationName("Google Calendar For P-Space");
-    $client->setAccessType('offline');
+    $client->setApplicationName("P-Space Google Calendar");
+
+
+    if (isset($_SESSION['token'])) {
+	$client->setAccessToken($_SESSION['token']);
+    }
+
+    $key = file_get_contents($keyFile);
+    $client->setAssertionCredentials(new Google_AssertionCredentials(
+	    $serviceAccountName, array('https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/calendar.readonly'), $key)
+    );
+
     $client->setClientId($clientID);
-    $client->setClientSecret($clientSecret);
-    $client->setRedirectUri($redirectUri);
-    $client->setDeveloperKey($developerKey);
+
+    //Save token in session
+    if ($client->getAccessToken()) {
+	echo 'Token: ' . $client->getAccessToken();
+	$_SESSION['token'] = $client->getAccessToken();
+    } else {
+	echo 'getAccessToken error';
+    }
+
+    if ($client->isAccessTokenExpired()) {
+	echo 'Token expired';
+    }
 
     $calendarService = new Google_CalendarService($client);
-
-    if (isset($_GET['logout'])) {
-	// logout: destroy token
-	unset($_SESSION['token']);
-	die('Logged out.');
-    }
-
-    if (isset($_GET['code'])) { // we received the positive auth callback, get the token and store it in session
-	$client->authenticate();
-	$_SESSION['token'] = $client->getAccessToken();
-    }
-
-    if (isset($_SESSION['token'])) { // extract token from session and configure client
-	$token = $_SESSION['token'];
-	$client->setAccessToken($token);
-    }
-
-    if (!$client->getAccessToken()) { // auth call to google
-	$authUrl = $client->createAuthUrl();
-	header("Location: " . $authUrl);
-	die;
-    }
 
     return $calendarService;
 }
@@ -266,7 +261,7 @@ function printEvent($event, $isAdmin) {
 	print "<h5>Στατιστικά</h5><p>Προσκεκλημένοι: " . $totalGuests . " Ναι: " . $guestsAccepted . " Οχι: " . $guestsDeclined . " Ίσως: " . $guestsTentative . " Καμία Απάντηση: " . $guestsPending . "</p>";
     }
     if ($isAdmin == true) {
-	print "<p><a eid='" . $event['id'] . "' onclick='deleteEvent(this)'>Διαγραφή του Γεγονότος</a></p>";
+	print "<p><a eid='" . $event ['id'] . "' onclick='deleteEvent(this)'>Διαγραφή του Γεγονότος</a></p>";
     }
     print "</div></td></tr>";
 }
@@ -277,12 +272,12 @@ function parseDateTime($start, $end) {
 	$endDate = date_create_from_format('Y-m-d', $end['date']);
 	$startDate = parseDate($startDate);
 	$endDate = parseDate($endDate);
-	if ($startDate == $endDate)
+	if ($startDate ==
+		$endDate)
 	    $date = $startDate;
 	else
 	    $date = $startDate . ' έως ' . $endDate;
-    }
-    else {
+    } else {
 	$startDate = date_create_from_format('Y-m-d\TG:i:sP', $start['dateTime']);
 	$endDate = date_create_from_format('Y-m-d\TG:i:sP', $end['dateTime']);
 	$startTime = parseTime($startDate);
@@ -291,10 +286,10 @@ function parseDateTime($start, $end) {
 	$endDate = parseDate($endDate);
 	$date = $startDate . ' στις ' . $startTime;
 	if ($startDate == $endDate) {
-	    $date.=' έως ' . $endTime;
+	    $date .= ' έως ' . $endTime;
 	}
 	else
-	    $date.=' έως ' . $endDate . ' στις ' . $endTime;
+	    $date .= ' έως ' . $endDate . ' στις ' . $endTime;
     }
     return $date;
 }
@@ -303,15 +298,6 @@ function deleteCalendarEvent($eventID) {
     $calendarID = variable_get('calendar_id');
     $calendarService = initGoogleClient();
     $calendarService->events->delete($calendarID, $eventID);
-}
-
-function displayNewEventForm() {
-    drupal_add_css(drupal_get_path('module', 'calendar') . '/css/calendar.css', NULL);
-    drupal_add_js(drupal_get_path('module', 'calendar') . '/js/jquery-2.0.1.min.js');
-    drupal_add_js(drupal_get_path('module', 'calendar') . '/js/jquery-ui.js');
-    drupal_add_js(drupal_get_path('module', 'calendar') . '/js/scrolltopcontrol.js');
-    drupal_add_js(drupal_get_path('module', 'calendar') . '/js/calendar.js');
-    include "createNewEvent.html";
 }
 
 function getWeekdayBYDAY($date) {
@@ -331,14 +317,16 @@ function insertCalendarEvent($data) {
     $event = new Google_Event();
     $event->setSummary($data['summary']);
 
-    if (isset($data['location']))
+    if (isset($data['loca
+	    tion']))
 	$event->setLocation($data['location']);
-    if (isset($data['description']))
+    if (isset($data['descrip
+	    tion']))
 	$event->setDescription($data['description']);
 
 
     $startDate = new Google_EventDateTime();
-    $endDate = new Google_EventDateTime();
+    $endDate = new Google_EventDateTime ();
     if (isset($data['fullDay'])) {
 	$startDate->setDate($data['startDate']);
 	$endDate->setDate($data['endDate']);
@@ -358,32 +346,34 @@ function insertCalendarEvent($data) {
 	$recurrenceRule = "RRULE:FREQ=" . $data['frequency'] . ";";
 
 	if ($data['expiration'] == "after") {
-	    $recurrenceRule.="COUNT=" . $data['occurrences'] . ";";
+	    $recurrenceRule .= "COUNT=" . $data['occurrences'] . ";";
 	} else if ($data['expiration'] == 'until') {
 	    $recurrenceEnd = date_create_from_format('Y-m-d', $data['recurrenceEnd']);
-	    $recurrenceRule.='UNTIL=' . $recurrenceEnd->format('Ymd') . ';';
+	    $recurrenceRule .= 'UNTIL=' . $recurrenceEnd->format('Ymd') . ';';
 	}
 
 
-	if ($data['frequency'] == 'DAILY')
+	if ($data['frequency'] ==
+		'DAILY')
 	    $recurrenceRule.="INTERVAL=" . $data['repeat'];
 	else if ($data['frequency'] == 'WEEKLY') {
-	    $recurrenceRule.="INTERVAL=" . $data['repeat'] . ';';
+	    $recurrenceRule.="INTERVAL=" . $data ['repeat'] . ';';
 	    if (isset($data['days'])) {
 		$days = implode(",", $data['days']);
-		if (in_array($recurrenceDay, $data['days']))
-		    $recurrenceRule.="BYDAY=" . $days;
+		if (in_array($recurrenceDay, $data['days'
+			]))
+		    $recurrenceRule .= "BYDAY=" . $days;
 		else
-		    $recurrenceRule.="BYDAY=" . $days . ',' . $recurrenceDay;
+		    $recurrenceRule .= "BYDAY=" . $days . ',' . $recurrenceDay;
 	    }
 	    else
-		$recurrenceRule.="BYDAY=" . $recurrenceDay;
-	}
-	else {
-	    $recurrenceRule.="INTERVAL=" . $data['repeat'] . ';';
-	    if ($data['days'] == 'weekday')
-		$recurrenceRule.='BYDAY=1' . $recurrenceDay;
-	    else if ($data['days'] == 'monthday') {
+		$recurrenceRule .= "BYDAY=" . $recurrenceDay;
+	} else {
+	    $recurrenceRule.="INTERVAL=" . $data ['repeat'] . ';';
+	    if ($data ['days'] ==
+		    'weekday')
+		$recurrenceRule .= 'BYDAY=1' . $recurrenceDay;
+	    else if ($data ['days'] == 'monthday') {
 		$day = date_create_from_format('Y-m-d', $data['startDate'])->format('d');
 		$recurrenceRule.="BYMONTHDAY=" . $day;
 	    }
@@ -429,9 +419,7 @@ function insertNewSubscriber($email) {
 	$xml->appendChild($xml->createElement('list'));
 	$xml->save($subscriptionFile);
     }
-    if (!($xml = simplexml_load_file($subscriptionFile))) {
-	echo 'error';
-    }
+    $xml = simplexml_load_file($subscriptionFile);
 
     $mailExists = false;
 
@@ -483,15 +471,15 @@ function uberdust_event_handler($startDate, $endDate) {
 	$time_left['minutes'] = $diff->format("%i");
 	$time_left['seconds'] = $diff->format("%s");
 
-	print " Time left for the Event to start: " . $time_left['years'] . " years," .
-		$time_left['months'] . " months," .
-		$time_left['days'] . " days," .
-		$time_left['hours'] . " hours," .
+	print " Time left for the Event to start: " . $time_left ['years'] . " years," .
+		$time_left ['months'] . " months," .
+		$time_left ['days'] . " days," .
+		$time_left ['hours'] . " hours," .
 		$time_left['minutes'] . " minutes," .
 		$time_left['seconds'] . " seconds";
 
-	if (( $time_left['years'] == 0) && ( $time_left['months'] == 0) && ( $time_left['days'] == 0)) {
-	    if ($time_left['hours'] <= 1) {
+	if (( $time_left ['years'] == 0) && ( $time_left ['months'] == 0) && ( $time_left ['days'] == 0)) {
+	    if ($time_left ['hours'] <= 1) {
 		//print "start the aircondition system";
 		//uberdust_activate_nodes(aircondition, zone, 1);
 		if ($time_left['minutes'] <= 10) {
@@ -509,14 +497,14 @@ function uberdust_event_handler($startDate, $endDate) {
 	$time_left['minutes'] = $diff->format("%i");
 	$time_left['seconds'] = $diff->format("%s");
 
-	print " Event has reached end " . $time_left['years'] . " years," .
-		$time_left['months'] . " months," .
-		$time_left['days'] . " days," .
-		$time_left['hours'] . " hours," .
+	print " Event has reached end " . $time_left ['years'] . " years," .
+		$time_left ['months'] . " months," .
+		$time_left ['days'] . " days," .
+		$time_left ['hours'] . " hours," .
 		$time_left['minutes'] . " minutes," .
 		$time_left['seconds'] . " seconds ago";
 
-	if (( $time_left['years'] == 0) && ( $time_left['months'] == 0) && ( $time_left['days'] == 0) && ( $time_left['hours'] == 0)) {
+	if (( $time_left ['years'] == 0) && ( $time_left ['months'] == 0) && ( $time_left ['days'] == 0) && ( $time_left ['hours'] == 0)) {
 	    if ($time_left['minutes'] >= 5) {
 		//print "stop the aircondition system";
 		//uberdust_activate_nodes(aircondition, zone, 0);
@@ -530,10 +518,10 @@ function uberdust_event_handler($startDate, $endDate) {
 function uberdust_activate_nodes($node, $zone, $status) {
     switch (node) {
 	case aircondition:
-	// $.post( "http://uberdust.cti.gr/rest/testbed/1/node/urn:wisebed:ctitestbed:150.140.5.67/capability/urn:wisebed:node:capability:" +zone +"r/0/",status);
-	// http://uberdust.cti.gr/rest/testbed/5/node/urn:pspace:0x0ba/capability/urn:node:capability:light_switch/json/limit/10  <== auto gia p-space
+// $.post( "http://uberdust.cti.gr/rest/testbed/1/node/urn:wisebed:ctitestbed:150.140.5.67/capability/urn:wisebed:node:capability:" +zone +"r/0/",status);
+// http://uberdust.cti.gr/rest/testbed/5/node/urn:pspace:0x0ba/capability/urn:node:capability:light_switch/json/limit/10  <== auto gia p-space
 	case lights:
-	//$.post( "http://uberdust.cti.gr/rest/testbed/1/node/urn:wisebed:ctitestbed:150.140.5.67/capability/urn:wisebed:node:capability:" +zone +"r/0/",status);
+//$.post( "http://uberdust.cti.gr/rest/testbed/1/node/urn:wisebed:ctitestbed:150.140.5.67/capability/urn:wisebed:node:capability:" +zone +"r/0/",status);
 	default:
     }
 }
