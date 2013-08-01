@@ -69,7 +69,7 @@ function calendar_form($form, &$form_state) {
     );
 
     $form['calendar_lights_on'] = array(
-	'#type' => 'number',
+	'#type' => 'textfield',
 	'#title' => t('Lights on time'),
 	'#default_value' => variable_get('calendar_lights_on'),
 	'#size' => 60,
@@ -78,7 +78,7 @@ function calendar_form($form, &$form_state) {
     );
 
     $form['calendar_lights_off'] = array(
-	'#type' => 'number',
+	'#type' => 'textfield',
 	'#title' => t('Lights off time'),
 	'#default_value' => variable_get('calendar_lights_off'),
 	'#size' => 60,
@@ -87,7 +87,7 @@ function calendar_form($form, &$form_state) {
     );
 
     $form['calendar_ac_on'] = array(
-	'#type' => 'number',
+	'#type' => 'textfield',
 	'#title' => t('A/C on time'),
 	'#default_value' => variable_get('calendar_ac_on'),
 	'#size' => 60,
@@ -96,7 +96,7 @@ function calendar_form($form, &$form_state) {
     );
 
     $form['calendar_ac_off'] = array(
-	'#type' => 'number',
+	'#type' => 'textfield',
 	'#title' => t('A/C off time'),
 	'#default_value' => variable_get('calendar_ac_off'),
 	'#size' => 60,
@@ -198,7 +198,6 @@ function initGoogleClient() {
 
     $clientID = variable_get('calendar_client_id');
     $serviceAccountName = variable_get('calendar_service_account');
-
     $keyFile = variable_get('calendar_key_path');
 
     $client = new Google_Client();
@@ -220,12 +219,6 @@ function initGoogleClient() {
     if ($client->getAccessToken()) {
 	echo 'Token: ' . $client->getAccessToken();
 	$_SESSION['token'] = $client->getAccessToken();
-    } else {
-	echo 'getAccessToken error';
-    }
-
-    if ($client->isAccessTokenExpired()) {
-	echo 'Token expired';
     }
 
     $calendarService = new Google_CalendarService($client);
