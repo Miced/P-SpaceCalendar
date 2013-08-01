@@ -68,6 +68,42 @@ function calendar_form($form, &$form_state) {
 	'#required' => TRUE,
     );
 
+    $form['calendar_lights_on'] = array(
+	'#type' => 'number',
+	'#title' => t('Lights on time'),
+	'#default_value' => variable_get('calendar_lights_on'),
+	'#size' => 60,
+	'#description' => t('How much time before the event the lights will turn on (mins).'),
+	'#required' => TRUE,
+    );
+
+    $form['calendar_lights_off'] = array(
+	'#type' => 'number',
+	'#title' => t('Lights off time'),
+	'#default_value' => variable_get('calendar_lights_off'),
+	'#size' => 60,
+	'#description' => t('How much time after the event the lights stay on (mins).'),
+	'#required' => TRUE,
+    );
+
+    $form['calendar_ac_on'] = array(
+	'#type' => 'number',
+	'#title' => t('A/C on time'),
+	'#default_value' => variable_get('calendar_ac_on'),
+	'#size' => 60,
+	'#description' => t('How much time before the event the A/C powers up (mins).'),
+	'#required' => TRUE,
+    );
+
+    $form['calendar_ac_off'] = array(
+	'#type' => 'number',
+	'#title' => t('A/C off time'),
+	'#default_value' => variable_get('calendar_ac_off'),
+	'#size' => 60,
+	'#description' => t('How much time after the event the A/C turns off (mins).'),
+	'#required' => TRUE,
+    );
+
     return system_settings_form($form);
 }
 
