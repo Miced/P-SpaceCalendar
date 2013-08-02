@@ -505,10 +505,13 @@ function uberdust_event_handler() {
     	{
     		$startDate = date_create_from_format($event['start']['date']);
     		$startDate->setTime(9,0,0);
+    		$endDate = date_create_from_format($event['end']['date']);
+    		$endDate->setTime(22,0,0);
     	}
     	else if(isset($event['start']['dateTime']))
     	{
     		$startDate = date_create_from_format($event['start']['dateTime']);
+    		$endDate = date_create_from_format($event['end']['dateTime']);
     	}
 
     	$diff = $startDate->diff($current_datetime);
@@ -523,14 +526,15 @@ function uberdust_event_handler() {
 
 			if ( $time_left['years'] == 0 && $time_left['months'] == 0  &&  $time_left['days'] == 0 && $time_left['hours'] == 0 ){
 
-				if ($time_left['minutes'] <= 30) {
-					uberdust_activate_nodes(ac, zone, 1);
-				if ($time_left['minutes'] <= 10) {
-		   			uberdust_activate_nodes(lights, zone, 1);
-				}
+				if ($time_left['minutes'] <= intval(variable_get('calendar_lights_on'))) 
+					uberdust_activate_nodes(lights, zone, 1);
+				
+				if ($time_left['minutes'] <= intval(variable_get('calendar_ac_on'))) 
+		   			uberdust_activate_nodes(ac, zone, 1);
+				
 			}
 		}
-	}
+	
 
 	else if ($current_datetime >= $endDate) {
 		$diff = $endDate->diff($current_datetime);
@@ -542,24 +546,25 @@ function uberdust_event_handler() {
 		$time_left['seconds'] = $diff->format("%s");
 
 		if (( $time_left['years'] == 0) && ( $time_left['months'] == 0) && ( $time_left['days'] == 0) && ( $time_left['hours'] == 0)) {
-			if ($time_left['minutes'] >= 5) {
-		//print "stop the aircondition system";
-		//uberdust_activate_nodes(aircondition, zone, 0);
-		//print "switch off the lights";
-		//uberdust_activate_nodes(light, zone, 0)'
+			
+				if ($time_left['minutes'] <= intval(variable_get('calendar_lights_off'))) 
+					uberdust_activate_nodes(lights, zone, 0);
+				
+				if ($time_left['minutes'] <= intval(variable_get('calendar_ac_off'))) 
+		   			uberdust_activate_nodes(ac, zone, 0);
 			}
 		}
 	}
 }
-}
+
 
 
 function uberdust_activate_nodes($node, $zone, $status) {
 
-	MAIN_URL = 'http://uberdust.cti.gr/rest/testbed/5/node/';
-	LIGHTS_REST = 'urn:pspace:0x2eb/capability/urn:node:capability:lz1/';
-	LAST_READING = 'latestreading';
-	
+	define('MAIN_URL','http://uberdust.cti.gr/rest/testbed/5/node/');
+	define('LIGHTS_REST','urn:pspace:0x2eb/capability/urn:node:capability:lz1/');
+	define('AC_REST','urn:pspace:0x466/capability/urn:node:capability:on/');
+	define('LAST_READING','latestreading');	
 
 	$curl = curl_init();
 
@@ -582,12 +587,28 @@ function uberdust_activate_nodes($node, $zone, $status) {
 		}
 	}
 
+	else if($node == ac)
+	{
 
-   
+		$url = MAIN_URL.AC_REST.LAST_READING;
+		curl_setopt($curl, CURLOPT_HTTPGET, 1);
+		curl_setopt($curl,CURLOPT_RETURNTRANSFER,1);
+		curl_setopt($curl, CURLOPT_URL, $url);
+		$response = explode(' ',curl_exec($curl));
+		$currentStatus = intval($response[1]);
 
-    }
+		if($status!=$currentStatus)
+		{
+			curl_reset($curl);
+			$url = MAIN_URL.AC_REST.$status.'/';
+			curl_setopt($curl, CURLOPT_POST, 1);
+			curl_setopt($curl, CURLOPT_URL, $url);
+			curl_exec($curl);
+		}
+
+	} 
+}
 
    //lights ON: node/urn:pspace:0x2eb/capability/urn:node:capability:lz1/1/
    //CHECK IF LIGHTS ONQ
-}
 
