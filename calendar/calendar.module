@@ -122,17 +122,18 @@ function calendarEventHandler() {
     else if (!empty($_GET['action'])) {
 	if ($_GET['action'] == 'delete') {
 	    deleteCalendarEvent($_GET['eid']);
-	    header('Location: ' . variable_get('calendar_redirect_uri'));
+	    header('Location: ' . $_SERVER['REQUEST_URI']);
 	}
     } else if (isset($_POST['createEvent'])) {
 	insertCalendarEvent($_POST);
-	header('Location: ' . variable_get('calendar_redirect_uri'));
+	header('Location: ' . $_SERVER['REQUEST_URI']);
     } else if (isset($_POST['subscribeButton'])) {
 	if ($_POST['subscribeButton'] == 'Εγγραφή')
 	    insertNewSubscriber($_POST['e-mail']);
 	else
 	    deleteSubscriber($_POST['e-mail']);
-	header('Location: ' . variable_get('calendar_redirect_uri'));
+	header('Location: ' . $_SERVER['REQUEST_URI']);
+	exit();
     }
 }
 
